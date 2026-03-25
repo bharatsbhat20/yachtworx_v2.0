@@ -1,20 +1,36 @@
+/**
+ * Marketplace — Module 2
+ *
+ * Provider discovery + booking entry point.
+ * Keeps all existing filter/search/view UI and adds
+ * the BookingWizard sheet for instant booking initiation.
+ */
+
 import React, { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { Search, SlidersHorizontal, MapPin, Clock, CheckCircle, Star, Grid, List, X } from 'lucide-react';
+import {
+  Search, SlidersHorizontal, MapPin, Clock, CheckCircle,
+  Star, Grid, List, X, CalendarPlus
+} from 'lucide-react';
 import { useServiceStore } from '../store/serviceStore';
+import { useAuthStore } from '../store/authStore';
 import { Input } from '../components/ui/Input';
 import { Badge } from '../components/ui/Badge';
 import { StarRating } from '../components/ui/StarRating';
 import { Avatar } from '../components/ui/Avatar';
 import { Card } from '../components/ui/Card';
+import { Button } from '../components/ui/Button';
+import { BookingWizard } from '../components/booking/BookingWizard';
+import type { ServiceProvider } from '../types';
 
 const categories = [
   'All', 'Engine', 'Electrical', 'Electronics', 'Hull', 'Rigging', 'Sails',
-  'Detailing', 'Haul-out', 'Diving', 'Navigation', 'Survey', 'Safety', 'Mechanical'
+  'Detailing', 'Haul-out', 'Diving', 'Navigation', 'Survey', 'Safety', 'Mechanical',
 ];
 
 export const Marketplace: React.FC = () => {
   const { providers } = useServiceStore();
+  const { user } = useAuthStore();
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -22,6 +38,12 @@ export const Marketplace: React.FC = () => {
   const [maxDistance, setMaxDistance] = useState(50);
   const [minRating, setMinRating] = useState(0);
   const [showFilters, setShowFilters] = useState(false);
+
+  // Booking wizard state
+  const [bookingProvider, setBookingProvider] = useState<ServiceProvider | null>(null);
+  const [bookingSuccess, setBookingSuccess] = useState<string | null>(null);
+
+  const isOwner = user?.role === 'owner' || !user;
 
   const filtered = useMemo(() => {
     let result = providers;
@@ -35,7 +57,9 @@ export const Marketplace: React.FC = () => {
       );
     }
     if (selectedCategory !== 'All') {
-      result = result.filter(p => p.categories.includes(selectedCategory));
+      result = result.filter(p =>
+        p.categories.some(c => c.toLowerCase().includes(selectedCategory.toLowerCase()))
+      );
     }
     if (maxDistance < 50) {
       result = result.filter(p => (p.distance || 0) <= maxDistance);
@@ -44,19 +68,27 @@ export const Marketplace: React.FC = () => {
       result = result.filter(p => p.rating >= minRating);
     }
     return [...result].sort((a, b) => {
-      if (sortBy === 'rating') return b.rating - a.rating;
+      if (sortBy === 'rating')   return b.rating - a.rating;
       if (sortBy === 'distance') return (a.distance || 99) - (b.distance || 99);
-      if (sortBy === 'reviews') return b.reviewCount - a.reviewCount;
+      if (sortBy === 'reviews')  return b.reviewCount - a.reviewCount;
       return 0;
     });
   }, [providers, search, selectedCategory, maxDistance, minRating, sortBy]);
 
+  const handleBookNow = (provider: ServiceProvider) => {
+    if (!user || user.role !== 'owner') {
+      window.location.href = '/auth';
+      return;
+    }
+    setBookingProvider(provider);
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 pt-20">
-      {/* Header */}
+      {/* ── Hero header ── */}
       <div className="bg-navy-500 py-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <motion.div initial={{ opacity: 1, y: 0 }} animate={{ opacity: 1, y: 0 }}>
+          <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}>
             <h1 className="text-3xl font-heading font-bold text-white mb-2">Service Marketplace</h1>
             <p className="text-white/60">Find verified marine professionals near you</p>
           </motion.div>
@@ -73,7 +105,9 @@ export const Marketplace: React.FC = () => {
             <button
               onClick={() => setShowFilters(!showFilters)}
               className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-medium transition-colors ${
-                showFilters ? 'bg-ocean-500 text-white border-ocean-500' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                showFilters
+                  ? 'bg-ocean-500 text-white border-ocean-500'
+                  : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
               }`}
             >
               <SlidersHorizontal size={16} />
@@ -84,7 +118,28 @@ export const Marketplace: React.FC = () => {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Category Pills */}
+
+        {/* Booking success banner */}
+        {bookingSuccess && (
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-6 bg-teal-50 border border-teal-200 rounded-xl px-5 py-4 flex items-center justify-between"
+          >
+            <div className="flex items-center gap-3">
+              <CheckCircle size={20} className="text-teal-500 flex-shrink-0" />
+              <div>
+                <p className="font-semibold text-teal-800 text-sm">Booking submitted!</p>
+                <p className="text-teal-600 text-xs">Reference: <span className="font-mono font-bold">{bookingSuccess}</span></p>
+              </div>
+            </div>
+            <button onClick={() => setBookingSuccess(null)} className="text-teal-400 hover:text-teal-600">
+              <X size={16} />
+            </button>
+          </motion.div>
+        )}
+
+        {/* Category pills */}
         <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-2 mb-6">
           {categories.map(cat => (
             <button
@@ -101,10 +156,10 @@ export const Marketplace: React.FC = () => {
           ))}
         </div>
 
-        {/* Filters Panel */}
+        {/* Filters panel */}
         {showFilters && (
           <motion.div
-            initial={{ opacity: 1, y: 0 }}
+            initial={{ opacity: 0, y: -8 }}
             animate={{ opacity: 1, y: 0 }}
             className="bg-white rounded-2xl border border-gray-100 p-6 mb-6 shadow-sm"
           >
@@ -171,20 +226,21 @@ export const Marketplace: React.FC = () => {
           </div>
         </div>
 
-        {/* Provider Grid */}
-        <div className={viewMode === 'grid'
-          ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6'
-          : 'space-y-4'
+        {/* Provider grid */}
+        <div className={
+          viewMode === 'grid'
+            ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6'
+            : 'space-y-4'
         }>
           {filtered.map((provider, i) => (
             <motion.div
               key={provider.id}
-              initial={{ opacity: 1, y: 0 }}
+              initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.05 }}
             >
               {viewMode === 'grid' ? (
-                <Card hover className="h-full">
+                <Card hover className="h-full flex flex-col">
                   {provider.featured && (
                     <div className="flex items-center gap-1.5 text-xs font-semibold text-gold-600 bg-gold-50 px-3 py-1.5 rounded-t-2xl -mx-6 -mt-6 mb-5 border-b border-gold-100">
                       <Star size={12} fill="currentColor" />
@@ -196,8 +252,7 @@ export const Marketplace: React.FC = () => {
                     <div className="flex flex-col gap-1 items-end">
                       {provider.verified && (
                         <div className="flex items-center gap-1 text-teal-600 text-xs font-medium">
-                          <CheckCircle size={12} />
-                          Verified
+                          <CheckCircle size={12} /> Verified
                         </div>
                       )}
                       <span className="text-xs text-gray-400 font-medium">{provider.yearsExperience}yr exp</span>
@@ -205,35 +260,39 @@ export const Marketplace: React.FC = () => {
                   </div>
                   <h3 className="font-heading font-semibold text-navy-500">{provider.name}</h3>
                   <p className="text-xs text-gray-500 mb-3">{provider.businessName}</p>
-
                   <div className="flex items-center gap-2 mb-3">
                     <StarRating rating={provider.rating} size="sm" />
                     <span className="text-xs font-bold text-navy-500">{provider.rating}</span>
                     <span className="text-xs text-gray-400">({provider.reviewCount.toLocaleString()})</span>
                   </div>
-
                   <div className="flex items-center gap-3 text-xs text-gray-400 mb-4">
                     <span className="flex items-center gap-1"><MapPin size={11} />{provider.distance} mi</span>
                     <span className="flex items-center gap-1"><Clock size={11} />{provider.responseTime}</span>
                   </div>
-
                   <div className="flex flex-wrap gap-1.5 mb-4">
                     {provider.categories.slice(0, 3).map(cat => (
                       <span key={cat} className="text-xs bg-ocean-50 text-ocean-600 px-2 py-0.5 rounded-full font-medium">{cat}</span>
                     ))}
                   </div>
-
-                  <div className="flex flex-wrap gap-1 mb-4">
-                    {provider.certifications.slice(0, 2).map(cert => (
-                      <span key={cert} className="text-xs bg-teal-50 text-teal-700 px-2 py-0.5 rounded-full">{cert}</span>
-                    ))}
+                  <div className="mt-auto pt-2">
+                    {isOwner ? (
+                      <Button
+                        variant="ocean"
+                        fullWidth
+                        icon={<CalendarPlus size={14} />}
+                        onClick={() => handleBookNow(provider)}
+                      >
+                        Book Now
+                      </Button>
+                    ) : (
+                      <button className="w-full bg-gray-100 text-gray-500 text-sm py-2.5 rounded-xl font-medium text-center">
+                        View Profile
+                      </button>
+                    )}
                   </div>
-
-                  <button className="w-full btn-ocean text-sm py-2.5 justify-center mt-auto">
-                    View Profile
-                  </button>
                 </Card>
               ) : (
+                /* List view */
                 <Card hover>
                   <div className="flex items-start gap-5">
                     <Avatar src={provider.avatar} alt={provider.name} size="xl" fallback={provider.name} />
@@ -250,7 +309,7 @@ export const Marketplace: React.FC = () => {
                             <StarRating rating={provider.rating} size="sm" />
                             <span className="text-sm font-bold text-navy-500">{provider.rating}</span>
                             <span className="text-sm text-gray-400">{provider.reviewCount.toLocaleString()} reviews</span>
-                            <span className="text-sm text-gray-400">·</span>
+                            <span className="text-sm text-gray-300">·</span>
                             <span className="text-sm text-gray-400">{provider.completedJobs.toLocaleString()} jobs</span>
                           </div>
                           <p className="text-sm text-gray-500 leading-relaxed line-clamp-2 mb-3">{provider.description}</p>
@@ -260,16 +319,29 @@ export const Marketplace: React.FC = () => {
                             ))}
                           </div>
                         </div>
-                        <div className="text-right flex-shrink-0">
-                          <div className="flex items-center gap-1 text-sm text-gray-400 mb-1 justify-end">
-                            <MapPin size={12} />
-                            {provider.distance} mi
+                        <div className="text-right flex-shrink-0 space-y-3">
+                          <div>
+                            <div className="flex items-center gap-1 text-sm text-gray-400 mb-1 justify-end">
+                              <MapPin size={12} /> {provider.distance} mi
+                            </div>
+                            <div className="flex items-center gap-1 text-sm text-gray-400 justify-end">
+                              <Clock size={12} /> {provider.responseTime}
+                            </div>
                           </div>
-                          <div className="flex items-center gap-1 text-sm text-gray-400 mb-4 justify-end">
-                            <Clock size={12} />
-                            {provider.responseTime}
-                          </div>
-                          <button className="btn-ocean text-sm py-2 px-5">View Profile</button>
+                          {isOwner ? (
+                            <Button
+                              variant="ocean"
+                              size="sm"
+                              icon={<CalendarPlus size={13} />}
+                              onClick={() => handleBookNow(provider)}
+                            >
+                              Book Now
+                            </Button>
+                          ) : (
+                            <button className="bg-gray-100 text-gray-500 text-sm py-2 px-5 rounded-xl font-medium">
+                              View Profile
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -280,17 +352,35 @@ export const Marketplace: React.FC = () => {
           ))}
         </div>
 
+        {/* Empty state */}
         {filtered.length === 0 && (
           <div className="text-center py-20">
             <Search size={48} className="text-gray-300 mx-auto mb-4" />
             <h3 className="text-xl font-heading font-semibold text-navy-500 mb-2">No providers found</h3>
             <p className="text-gray-500 mb-6">Try adjusting your search or filters</p>
-            <button onClick={() => { setSearch(''); setSelectedCategory('All'); setMinRating(0); }} className="btn-ocean">
-              <X size={16} /> Clear Filters
-            </button>
+            <Button
+              variant="secondary"
+              icon={<X size={16} />}
+              onClick={() => { setSearch(''); setSelectedCategory('All'); setMinRating(0); }}
+            >
+              Clear Filters
+            </Button>
           </div>
         )}
       </div>
+
+      {/* Booking Wizard */}
+      {bookingProvider && (
+        <BookingWizard
+          provider={bookingProvider}
+          isOpen={!!bookingProvider}
+          onClose={() => setBookingProvider(null)}
+          onSuccess={(ref) => {
+            setBookingProvider(null);
+            setBookingSuccess(ref);
+          }}
+        />
+      )}
     </div>
   );
 };

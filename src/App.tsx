@@ -10,12 +10,13 @@ import { ServiceRequests } from './pages/ServiceRequests';
 import { Documents } from './pages/Documents';
 import { Messages } from './pages/Messages';
 import { ProviderLanding } from './pages/ProviderLanding';
-import { ProviderRegistration } from './pages/ProviderRegistration';
-import { ProviderDashboard } from './pages/ProviderDashboard';
+import ProviderRegistration from './pages/ProviderRegistration';
+import ProviderDashboard from './pages/ProviderDashboard';
+import AdminDashboard from './pages/AdminDashboard';
 import { AuthPage } from './pages/AuthPage';
 import { useAuthStore } from './store/authStore';
 
-const noNavbarRoutes = ['/auth', '/register-provider'];
+const noNavbarRoutes = ['/auth', '/register-provider', '/admin'];
 
 // ─── ProtectedRoute ───────────────────────────────────────────────────────────
 // Redirects to /auth if the user is not authenticated.
@@ -60,6 +61,9 @@ const AppContent: React.FC = () => {
 
           {/* Protected — provider */}
           <Route path="/provider-dashboard" element={<ProtectedRoute><ProviderDashboard /></ProtectedRoute>} />
+
+          {/* Protected — admin */}
+          <Route path="/admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
         </Routes>
       </AnimatePresence>
     </>

@@ -11,10 +11,18 @@ export interface User {
   role: UserRole;
   emailVerified: boolean;
   avatarUrl?: string;
+  avatar?: string;   // legacy alias for avatarUrl
   phone?: string;
   location?: string;
+  // Provider-specific Stripe fields
+  stripeAccountId?: string;
+  stripeAccountStatus?: 'pending' | 'active' | 'restricted' | 'disabled';
+  stripePayoutsEnabled?: boolean;
+  stripeChargesEnabled?: boolean;
+  // Booking mode preference
+  bookingMode?: 'request_to_book' | 'instant_book';
   createdAt: string;
-  updatedAt: string;
+  updatedAt?: string;
   deletedAt?: string;
 }
 
@@ -312,7 +320,7 @@ export interface Service {
   duration?: string;
 }
 
-// ─── Service Requests ────────────────────────────────────────────────────────
+// ─── Service Requests (legacy — kept for backward compat) ─────────────────────
 
 export interface ServiceRequest {
   id: string;
@@ -341,6 +349,202 @@ export interface Quote {
   eta: string;
   createdAt: string;
 }
+
+// ─── Module 2: Bookings ───────────────────────────────────────────────────────
+
+export type BookingStatus =
+  | 'DRAFT'
+  | 'PENDING'
+  | 'QUOTED'
+  | 'CONFIRMED'
+  | 'IN_PROGRESS'
+  | 'COMPLETED'
+  | 'PAYOUT_RELEASED'
+  | 'CANCELLED'
+  | 'DISPUTED'
+  | 'REFUNDED'
+  | 'RESCHEDULED';
+
+export type BookingMode = 'request_to_book' | 'instant_book';
+export type LocationType = 'marina' | 'address' | 'onwater';
+export type PriceType = 'fixed' | 'hourly' | 'quote';
+export type PaymentStatus =
+  | 'pending'
+  | 'authorized'
+  | 'captured'
+  | 'refunded'
+  | 'partially_refunded'
+  | 'failed'
+  | 'voided';
+
+export interface Booking {
+  id: string;
+  reference: string;           // YW-2024-008421
+  ownerId: string;
+  ownerName?: string;
+  providerId: string;
+  providerName?: string;
+  providerAvatar?: string;
+  boatId: string;
+  boatName?: string;
+  serviceId: string;
+  serviceName: string;
+  serviceType: string;
+  location: string;
+  locationType: LocationType;
+  scheduledStart: string;      // UTC ISO string
+  scheduledEnd: string;        // UTC ISO string
+  durationMinutes: number;
+  priceType: PriceType;
+  quotedAmount?: number;
+  finalAmount?: number;
+  priceAmount: number;
+  currency: string;
+  platformFeePercent: number;
+  platformFeeAmount: number;
+  providerPayoutAmount: number;
+  status: BookingStatus;
+  bookingMode: BookingMode;
+  notes?: string;
+  paymentIntentId?: string;
+  paymentStatus?: PaymentStatus;
+  cancellationReason?: string;
+  cancelledBy?: 'owner' | 'provider' | 'admin' | 'system';
+  cancelledAt?: string;
+  confirmedAt?: string;
+  startedAt?: string;
+  completedAt?: string;
+  payoutReleasedAt?: string;
+  rescheduledFrom?: string;
+  deletedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Payment {
+  id: string;
+  bookingId: string;
+  ownerId: string;
+  providerId: string;
+  amount: number;
+  currency: string;
+  platformFeePercent: number;
+  platformFeeAmount: number;
+  providerPayout: number;
+  paymentStatus: PaymentStatus;
+  stripePaymentIntentId?: string;
+  stripeChargeId?: string;
+  stripeTransferId?: string;
+  stripeRefundId?: string;
+  refundAmount?: number;
+  refundedAt?: string;
+  payoutReleasedAt?: string;
+  idempotencyKey: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Review {
+  id: string;
+  bookingId: string;
+  reviewerId: string;
+  reviewerName?: string;
+  providerId: string;
+  rating: number;    // 1–5
+  comment?: string;
+  createdAt: string;
+}
+
+// ─── Module 2: Provider Services Catalog ─────────────────────────────────────
+
+export interface ProviderService {
+  id: string;
+  providerId: string;
+  name: string;
+  category: string;
+  description?: string;
+  priceType: PriceType;
+  basePrice?: number;
+  durationMinutes: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ─── Module 2: Provider Availability ─────────────────────────────────────────
+
+export interface ProviderAvailability {
+  id: string;
+  providerId: string;
+  dayOfWeek: number;          // 0=Sun, 6=Sat
+  startTime: string;          // "09:00"
+  endTime: string;            // "17:00"
+  bufferMinutes: number;
+  maxJobsPerDay: number;
+  minNoticeHours: number;
+  maxAdvanceDays: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProviderBlackout {
+  id: string;
+  providerId: string;
+  blackoutDate: string;       // YYYY-MM-DD
+  reason?: string;
+  createdAt: string;
+}
+
+export interface TimeSlot {
+  start: string;              // UTC ISO string
+  end: string;
+  available: boolean;
+}
+
+// ─── Module 2: Booking Form Data ─────────────────────────────────────────────
+
+export interface CreateBookingFormData {
+  providerId: string;
+  boatId: string;
+  serviceId: string;
+  location: string;
+  locationType: LocationType;
+  proposedStart: string;      // UTC ISO string
+  notes?: string;
+}
+
+// ─── Booking status display helpers ──────────────────────────────────────────
+
+export const BOOKING_STATUS_LABELS: Record<BookingStatus, string> = {
+  DRAFT:           'Draft',
+  PENDING:         'Pending',
+  QUOTED:          'Quote Received',
+  CONFIRMED:       'Confirmed',
+  IN_PROGRESS:     'In Progress',
+  COMPLETED:       'Completed',
+  PAYOUT_RELEASED: 'Paid Out',
+  CANCELLED:       'Cancelled',
+  DISPUTED:        'Disputed',
+  REFUNDED:        'Refunded',
+  RESCHEDULED:     'Rescheduled',
+};
+
+export const BOOKING_STATUS_COLORS: Record<BookingStatus, string> = {
+  DRAFT:           'gray',
+  PENDING:         'ocean',
+  QUOTED:          'info',
+  CONFIRMED:       'teal',
+  IN_PROGRESS:     'attention',
+  COMPLETED:       'good',
+  PAYOUT_RELEASED: 'good',
+  CANCELLED:       'critical',
+  DISPUTED:        'critical',
+  REFUNDED:        'gray',
+  RESCHEDULED:     'info',
+};
+
+export const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 // ─── Messaging ───────────────────────────────────────────────────────────────
 
@@ -478,3 +682,285 @@ export const DEFAULT_COMPONENTS: Record<string, Array<{ name: string; category: 
     { name: 'Electronics / Navigation', category: 'Electronics', serviceIntervalDays: 730 },
   ],
 };
+
+// ─── Module 3: Provider Onboarding & Verification ────────────────────────────
+
+export type VerificationStatus =
+  | 'unverified'
+  | 'email_verified'
+  | 'pending_review'
+  | 'approved'
+  | 'rejected'
+  | 'suspended';
+
+export type DocumentType =
+  | 'business_license'
+  | 'insurance_coi'
+  | 'abyc_certification'
+  | 'manufacturer_cert'
+  | 'other';
+
+export type DocumentStatus = 'pending' | 'approved' | 'rejected';
+
+export type ServiceAreaType = 'zip_code' | 'marina' | 'city' | 'radius';
+
+export type MediaType = 'photo' | 'video';
+
+export type FraudFlagStatus = 'open' | 'reviewed' | 'dismissed';
+
+export type TrustScoreSource = 'nightly_job' | 'admin_override' | 'initial';
+
+export type AdminRole = 'moderator' | 'super_admin';
+
+// ─── Provider Document ────────────────────────────────────────────────────────
+
+export interface ProviderDocument {
+  id: string;
+  providerId: string;
+  documentType: DocumentType;
+  documentLabel?: string;
+  fileUrl: string;
+  fileName?: string;
+  fileSizeBytes?: number;
+  mimeType?: string;
+  expirationDate?: string;        // YYYY-MM-DD
+  status: DocumentStatus;
+  rejectionReason?: string;
+  reviewedAt?: string;
+  reviewedBy?: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ─── Provider Service Area ────────────────────────────────────────────────────
+
+export interface ProviderServiceArea {
+  id: string;
+  providerId: string;
+  areaType: ServiceAreaType;
+  label: string;
+  zipCode?: string;
+  city?: string;
+  state?: string;
+  radiusKm?: number;
+  latitude?: number;
+  longitude?: number;
+  isActive: boolean;
+  createdAt: string;
+}
+
+// ─── Provider Portfolio Item ──────────────────────────────────────────────────
+
+export interface ProviderPortfolioItem {
+  id: string;
+  providerId: string;
+  mediaUrl: string;
+  thumbnailUrl?: string;
+  caption?: string;
+  mediaType: MediaType;
+  displayOrder: number;
+  isActive: boolean;
+  createdAt: string;
+}
+
+// ─── Trust Score Log ──────────────────────────────────────────────────────────
+
+export interface TrustScoreLog {
+  id: string;
+  providerId: string;
+  score: number;
+  source: TrustScoreSource;
+  adminId?: string;
+  overrideReason?: string;
+  compRating?: number;
+  compCompletion?: number;
+  compCancellation?: number;
+  compInsurance?: number;
+  compLicense?: number;
+  compResponse?: number;
+  computedAt: string;
+}
+
+// ─── Admin Audit Log ──────────────────────────────────────────────────────────
+
+export interface AdminAuditLog {
+  id: string;
+  adminId: string;
+  actionType: string;
+  targetType: string;
+  targetId: string;
+  previousValue?: Record<string, unknown>;
+  newValue?: Record<string, unknown>;
+  reason?: string;
+  ipAddress?: string;
+  createdAt: string;
+}
+
+// ─── Fraud Flag ───────────────────────────────────────────────────────────────
+
+export interface FraudFlag {
+  id: string;
+  providerId?: string;
+  flagType: string;
+  detail?: Record<string, unknown>;
+  status: FraudFlagStatus;
+  reviewedBy?: string;
+  reviewedAt?: string;
+  createdAt: string;
+}
+
+// ─── Notification ─────────────────────────────────────────────────────────────
+
+export interface AppNotification {
+  id: string;
+  userId: string;
+  type: string;
+  title: string;
+  body?: string;
+  link?: string;
+  isRead: boolean;
+  createdAt: string;
+}
+
+// ─── Extended Review (Module 3 additions) ────────────────────────────────────
+
+export interface ReviewExtended extends Review {
+  reviewerName?: string;
+  commRating?: number;
+  qualityRating?: number;
+  punctualityRating?: number;
+  providerResponse?: string;
+  providerRespondedAt?: string;
+  flagged?: boolean;
+  flaggedReason?: string;
+  isVisible?: boolean;
+}
+
+// ─── Provider Profile (full, reconciled) ─────────────────────────────────────
+
+export interface ProviderProfile {
+  id: string;
+  // Identity
+  businessName: string;
+  contactName: string;
+  email: string;
+  phone?: string;
+  role: UserRole;
+  // Location
+  addressLine1?: string;
+  addressCity?: string;
+  addressState?: string;
+  addressZip?: string;
+  addressCountry?: string;
+  latitude?: number;
+  longitude?: number;
+  // Profile
+  bio?: string;
+  yearsInBusiness?: number;
+  emergencyAvailability: boolean;
+  profilePhotoUrl?: string;
+  logoUrl?: string;
+  serviceCategories: string[];
+  // Verification
+  verificationStatus: VerificationStatus;
+  emailVerifiedAt?: string;
+  termsAcceptedAt?: string;
+  approvedAt?: string;
+  rejectedAt?: string;
+  suspendedAt?: string;
+  rejectionReason?: string;
+  profileComplete: boolean;
+  // Stripe
+  stripeAccountId?: string;
+  stripeStatus?: 'pending' | 'active' | 'restricted' | 'disabled';
+  stripeChargesEnabled: boolean;
+  stripePayoutsEnabled: boolean;
+  stripeOnboardingComplete: boolean;
+  // Trust
+  trustScore: number;
+  trustScoreOverride: boolean;
+  trustScoreOverrideReason?: string;
+  trustScoreUpdatedAt?: string;
+  // Computed metrics
+  avgRating?: number;
+  reviewCount: number;
+  totalJobsCompleted: number;
+  completionRate?: number;
+  cancellationRate?: number;
+  onTimePercent?: number;
+  avgResponseHours?: number;
+  // Featured
+  isFeatured: boolean;
+  featuredUntil?: string;
+  // Timestamps
+  createdAt: string;
+  updatedAt?: string;
+  deletedAt?: string;
+}
+
+// ─── Onboarding form data ─────────────────────────────────────────────────────
+
+export interface ProviderRegistrationFormData {
+  businessName: string;
+  contactName: string;
+  email: string;
+  phone: string;
+  password: string;
+  termsAccepted: boolean;
+}
+
+export interface ProviderProfileFormData {
+  serviceCategories: string[];
+  yearsInBusiness: number;
+  bio: string;
+  addressLine1: string;
+  addressCity: string;
+  addressState: string;
+  addressZip: string;
+  addressCountry: string;
+  emergencyAvailability: boolean;
+}
+
+// ─── Verification status display helpers ─────────────────────────────────────
+
+export const VERIFICATION_STATUS_LABELS: Record<VerificationStatus, string> = {
+  unverified:      'Unverified',
+  email_verified:  'Email Verified',
+  pending_review:  'Pending Review',
+  approved:        'Approved',
+  rejected:        'Rejected',
+  suspended:       'Suspended',
+};
+
+export const VERIFICATION_STATUS_COLORS: Record<VerificationStatus, string> = {
+  unverified:      'gray',
+  email_verified:  'ocean',
+  pending_review:  'attention',
+  approved:        'good',
+  rejected:        'critical',
+  suspended:       'critical',
+};
+
+export const DOCUMENT_TYPE_LABELS: Record<DocumentType, string> = {
+  business_license:    'Business Licence',
+  insurance_coi:       'Insurance Certificate (COI)',
+  abyc_certification:  'ABYC Certification',
+  manufacturer_cert:   'Manufacturer Certification',
+  other:               'Other',
+};
+
+export const SERVICE_CATEGORIES = [
+  'Engine & Mechanical',
+  'Electrical Systems',
+  'Hull & Exterior',
+  'Rigging & Sails',
+  'Electronics & Navigation',
+  'Plumbing & Systems',
+  'Safety & Surveys',
+  'Interior & Upholstery',
+  'Seasonal Services',
+  'Painting & Varnishing',
+] as const;
+
+export type ServiceCategory = typeof SERVICE_CATEGORIES[number];

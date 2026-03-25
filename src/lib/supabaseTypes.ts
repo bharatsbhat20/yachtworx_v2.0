@@ -3,13 +3,18 @@
 // ---------------------------------------------------------------------------
 
 export interface ProfileRow {
-  id: string;                 // = auth.users.id
+  id: string;
   first_name: string;
   last_name: string;
   email: string;
   role: 'owner' | 'provider' | 'admin';
   phone: string | null;
   avatar_url: string | null;
+  stripe_account_id: string | null;
+  stripe_account_status: string | null;
+  stripe_payouts_enabled: boolean;
+  stripe_charges_enabled: boolean;
+  booking_mode: 'request_to_book' | 'instant_book';
   created_at: string;
   updated_at: string;
 }
@@ -125,6 +130,36 @@ export interface Database {
         Insert: Omit<BoatSpecsCacheRow, 'created_at'>;
         Update: Partial<Omit<BoatSpecsCacheRow, 'id' | 'created_at'>>;
       };
+      provider_services: {
+        Row: ProviderServiceRow;
+        Insert: Omit<ProviderServiceRow, 'created_at' | 'updated_at'>;
+        Update: Partial<Omit<ProviderServiceRow, 'id' | 'provider_id' | 'created_at' | 'updated_at'>>;
+      };
+      provider_availability: {
+        Row: ProviderAvailabilityRow;
+        Insert: Omit<ProviderAvailabilityRow, 'created_at' | 'updated_at'>;
+        Update: Partial<Omit<ProviderAvailabilityRow, 'id' | 'provider_id' | 'created_at' | 'updated_at'>>;
+      };
+      provider_blackouts: {
+        Row: ProviderBlackoutRow;
+        Insert: Omit<ProviderBlackoutRow, 'created_at'>;
+        Update: Partial<Omit<ProviderBlackoutRow, 'id' | 'created_at'>>;
+      };
+      bookings: {
+        Row: BookingRow;
+        Insert: Omit<BookingRow, 'created_at' | 'updated_at'>;
+        Update: Partial<Omit<BookingRow, 'id' | 'owner_id' | 'created_at' | 'updated_at'>>;
+      };
+      payments: {
+        Row: PaymentRow;
+        Insert: Omit<PaymentRow, 'created_at' | 'updated_at'>;
+        Update: Partial<Omit<PaymentRow, 'id' | 'booking_id' | 'created_at' | 'updated_at'>>;
+      };
+      reviews: {
+        Row: ReviewRow;
+        Insert: Omit<ReviewRow, 'created_at'>;
+        Update: Partial<Omit<ReviewRow, 'id' | 'booking_id' | 'created_at'>>;
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
@@ -133,10 +168,123 @@ export interface Database {
 }
 
 // ---------------------------------------------------------------------------
+// Module 2 Row Types
+// ---------------------------------------------------------------------------
+
+export interface ProviderServiceRow {
+  id: string;
+  provider_id: string;
+  name: string;
+  category: string;
+  description: string | null;
+  price_type: 'fixed' | 'hourly' | 'quote';
+  base_price: number | null;
+  duration_minutes: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProviderAvailabilityRow {
+  id: string;
+  provider_id: string;
+  day_of_week: number;
+  start_time: string;
+  end_time: string;
+  buffer_minutes: number;
+  max_jobs_per_day: number;
+  min_notice_hours: number;
+  max_advance_days: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProviderBlackoutRow {
+  id: string;
+  provider_id: string;
+  blackout_date: string;
+  reason: string | null;
+  created_at: string;
+}
+
+export interface BookingRow {
+  id: string;
+  reference: string;
+  owner_id: string;
+  provider_id: string;
+  boat_id: string;
+  service_id: string;
+  service_type: string;
+  service_name: string;
+  location: string;
+  location_type: string;
+  scheduled_start: string;
+  scheduled_end: string;
+  duration_minutes: number;
+  price_type: string;
+  quoted_amount: number | null;
+  final_amount: number | null;
+  price_amount: number;
+  currency: string;
+  platform_fee_percent: number;
+  platform_fee_amount: number;
+  provider_payout_amount: number;
+  status: string;
+  booking_mode: string;
+  notes: string | null;
+  payment_intent_id: string | null;
+  cancellation_reason: string | null;
+  cancelled_by: string | null;
+  cancelled_at: string | null;
+  confirmed_at: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+  payout_released_at: string | null;
+  rescheduled_from: string | null;
+  deleted_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PaymentRow {
+  id: string;
+  booking_id: string;
+  owner_id: string;
+  provider_id: string;
+  amount: number;
+  currency: string;
+  platform_fee_percent: number;
+  platform_fee_amount: number;
+  provider_payout: number;
+  payment_status: string;
+  stripe_payment_intent_id: string | null;
+  stripe_charge_id: string | null;
+  stripe_transfer_id: string | null;
+  stripe_refund_id: string | null;
+  refund_amount: number | null;
+  refunded_at: string | null;
+  payout_released_at: string | null;
+  idempotency_key: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ReviewRow {
+  id: string;
+  booking_id: string;
+  reviewer_id: string;
+  provider_id: string;
+  rating: number;
+  comment: string | null;
+  created_at: string;
+}
+
+// ---------------------------------------------------------------------------
 // Bidirectional mappers: DB row  ↔  App interface
 // ---------------------------------------------------------------------------
 
-import type { User, Boat, BoatComponent, MaintenanceDocument } from '../types';
+import type { User, Boat, BoatComponent, MaintenanceDocument, Booking, Payment, Review, ProviderService, ProviderAvailability, ProviderBlackout } from '../types';
 
 export function rowToUser(p: ProfileRow): User {
   return {
@@ -149,7 +297,12 @@ export function rowToUser(p: ProfileRow): User {
     phone: p.phone ?? undefined,
     avatarUrl: p.avatar_url ?? undefined,
     avatar: p.avatar_url ?? undefined,
-    emailVerified: true,        // only set after Supabase confirms email
+    emailVerified: true,
+    stripeAccountId: p.stripe_account_id ?? undefined,
+    stripeAccountStatus: (p.stripe_account_status as User['stripeAccountStatus']) ?? undefined,
+    stripePayoutsEnabled: p.stripe_payouts_enabled,
+    stripeChargesEnabled: p.stripe_charges_enabled,
+    bookingMode: p.booking_mode,
     createdAt: p.created_at,
   };
 }
@@ -296,5 +449,376 @@ export function documentToInsert(d: Partial<MaintenanceDocument> & {
     notes: d.notes ?? null,
     title: d.title ?? d.fileName,
     deleted_at: null,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Module 2 Mappers
+// ---------------------------------------------------------------------------
+
+export function rowToProviderService(r: ProviderServiceRow): ProviderService {
+  return {
+    id: r.id,
+    providerId: r.provider_id,
+    name: r.name,
+    category: r.category,
+    description: r.description ?? undefined,
+    priceType: r.price_type,
+    basePrice: r.base_price ?? undefined,
+    durationMinutes: r.duration_minutes,
+    isActive: r.is_active,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+  };
+}
+
+export function rowToAvailability(r: ProviderAvailabilityRow): ProviderAvailability {
+  return {
+    id: r.id,
+    providerId: r.provider_id,
+    dayOfWeek: r.day_of_week,
+    startTime: r.start_time,
+    endTime: r.end_time,
+    bufferMinutes: r.buffer_minutes,
+    maxJobsPerDay: r.max_jobs_per_day,
+    minNoticeHours: r.min_notice_hours,
+    maxAdvanceDays: r.max_advance_days,
+    isActive: r.is_active,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+  };
+}
+
+export function rowToBlackout(r: ProviderBlackoutRow): ProviderBlackout {
+  return {
+    id: r.id,
+    providerId: r.provider_id,
+    blackoutDate: r.blackout_date,
+    reason: r.reason ?? undefined,
+    createdAt: r.created_at,
+  };
+}
+
+export function rowToBooking(r: BookingRow): Booking {
+  return {
+    id: r.id,
+    reference: r.reference,
+    ownerId: r.owner_id,
+    providerId: r.provider_id,
+    boatId: r.boat_id,
+    serviceId: r.service_id,
+    serviceType: r.service_type,
+    serviceName: r.service_name,
+    location: r.location,
+    locationType: r.location_type as Booking['locationType'],
+    scheduledStart: r.scheduled_start,
+    scheduledEnd: r.scheduled_end,
+    durationMinutes: r.duration_minutes,
+    priceType: r.price_type as Booking['priceType'],
+    quotedAmount: r.quoted_amount ?? undefined,
+    finalAmount: r.final_amount ?? undefined,
+    priceAmount: r.price_amount,
+    currency: r.currency,
+    platformFeePercent: r.platform_fee_percent,
+    platformFeeAmount: r.platform_fee_amount,
+    providerPayoutAmount: r.provider_payout_amount,
+    status: r.status as Booking['status'],
+    bookingMode: r.booking_mode as Booking['bookingMode'],
+    notes: r.notes ?? undefined,
+    paymentIntentId: r.payment_intent_id ?? undefined,
+    cancellationReason: r.cancellation_reason ?? undefined,
+    cancelledBy: r.cancelled_by as Booking['cancelledBy'] ?? undefined,
+    cancelledAt: r.cancelled_at ?? undefined,
+    confirmedAt: r.confirmed_at ?? undefined,
+    startedAt: r.started_at ?? undefined,
+    completedAt: r.completed_at ?? undefined,
+    payoutReleasedAt: r.payout_released_at ?? undefined,
+    rescheduledFrom: r.rescheduled_from ?? undefined,
+    deletedAt: r.deleted_at ?? undefined,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+  };
+}
+
+export function rowToPayment(r: PaymentRow): Payment {
+  return {
+    id: r.id,
+    bookingId: r.booking_id,
+    ownerId: r.owner_id,
+    providerId: r.provider_id,
+    amount: r.amount,
+    currency: r.currency,
+    platformFeePercent: r.platform_fee_percent,
+    platformFeeAmount: r.platform_fee_amount,
+    providerPayout: r.provider_payout,
+    paymentStatus: r.payment_status as Payment['paymentStatus'],
+    stripePaymentIntentId: r.stripe_payment_intent_id ?? undefined,
+    stripeChargeId: r.stripe_charge_id ?? undefined,
+    stripeTransferId: r.stripe_transfer_id ?? undefined,
+    stripeRefundId: r.stripe_refund_id ?? undefined,
+    refundAmount: r.refund_amount ?? undefined,
+    refundedAt: r.refunded_at ?? undefined,
+    payoutReleasedAt: r.payout_released_at ?? undefined,
+    idempotencyKey: r.idempotency_key,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+  };
+}
+
+export function rowToReview(r: ReviewRow): Review {
+  return {
+    id: r.id,
+    bookingId: r.booking_id,
+    reviewerId: r.reviewer_id,
+    providerId: r.provider_id,
+    rating: r.rating,
+    comment: r.comment ?? undefined,
+    createdAt: r.created_at,
+  };
+}
+
+// =============================================================================
+// MODULE 3 — Row types & mappers
+// =============================================================================
+
+import type {
+  ProviderDocument,
+  ProviderServiceArea,
+  ProviderPortfolioItem,
+  TrustScoreLog,
+  AdminAuditLog,
+  FraudFlag,
+  AppNotification,
+  ReviewExtended,
+  ProviderProfile,
+} from '../types';
+
+// ─── Row interfaces ───────────────────────────────────────────────────────────
+
+export interface ProviderDocumentRow {
+  id: string;
+  provider_id: string;
+  document_type: string;
+  document_label: string | null;
+  file_url: string;
+  file_name: string | null;
+  file_size_bytes: number | null;
+  mime_type: string | null;
+  expiration_date: string | null;
+  status: string;
+  rejection_reason: string | null;
+  reviewed_at: string | null;
+  reviewed_by: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProviderServiceAreaRow {
+  id: string;
+  provider_id: string;
+  area_type: string;
+  label: string;
+  zip_code: string | null;
+  city: string | null;
+  state: string | null;
+  radius_km: number | null;
+  latitude: number | null;
+  longitude: number | null;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface ProviderPortfolioRow {
+  id: string;
+  provider_id: string;
+  media_url: string;
+  thumbnail_url: string | null;
+  caption: string | null;
+  media_type: string;
+  display_order: number;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface TrustScoreLogRow {
+  id: string;
+  provider_id: string;
+  score: number;
+  source: string;
+  admin_id: string | null;
+  override_reason: string | null;
+  comp_rating: number | null;
+  comp_completion: number | null;
+  comp_cancellation: number | null;
+  comp_insurance: number | null;
+  comp_license: number | null;
+  comp_response: number | null;
+  computed_at: string;
+}
+
+export interface AdminAuditLogRow {
+  id: string;
+  admin_id: string;
+  action_type: string;
+  target_type: string;
+  target_id: string;
+  previous_value: Record<string, unknown> | null;
+  new_value: Record<string, unknown> | null;
+  reason: string | null;
+  ip_address: string | null;
+  created_at: string;
+}
+
+export interface FraudFlagRow {
+  id: string;
+  provider_id: string | null;
+  flag_type: string;
+  detail: Record<string, unknown> | null;
+  status: string;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  created_at: string;
+}
+
+export interface NotificationRow {
+  id: string;
+  user_id: string;
+  type: string;
+  title: string;
+  body: string | null;
+  link: string | null;
+  is_read: boolean;
+  created_at: string;
+}
+
+export interface ReviewExtendedRow extends ReviewRow {
+  reviewer_name: string | null;
+  comm_rating: number | null;
+  quality_rating: number | null;
+  punctuality_rating: number | null;
+  provider_response: string | null;
+  provider_responded_at: string | null;
+  flagged: boolean;
+  flagged_reason: string | null;
+  is_visible: boolean;
+}
+
+// ─── Mapper functions ─────────────────────────────────────────────────────────
+
+export function rowToProviderDocument(r: ProviderDocumentRow): ProviderDocument {
+  return {
+    id: r.id,
+    providerId: r.provider_id,
+    documentType: r.document_type as ProviderDocument['documentType'],
+    documentLabel: r.document_label ?? undefined,
+    fileUrl: r.file_url,
+    fileName: r.file_name ?? undefined,
+    fileSizeBytes: r.file_size_bytes ?? undefined,
+    mimeType: r.mime_type ?? undefined,
+    expirationDate: r.expiration_date ?? undefined,
+    status: r.status as ProviderDocument['status'],
+    rejectionReason: r.rejection_reason ?? undefined,
+    reviewedAt: r.reviewed_at ?? undefined,
+    reviewedBy: r.reviewed_by ?? undefined,
+    isActive: r.is_active,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+  };
+}
+
+export function rowToServiceArea(r: ProviderServiceAreaRow): ProviderServiceArea {
+  return {
+    id: r.id,
+    providerId: r.provider_id,
+    areaType: r.area_type as ProviderServiceArea['areaType'],
+    label: r.label,
+    zipCode: r.zip_code ?? undefined,
+    city: r.city ?? undefined,
+    state: r.state ?? undefined,
+    radiusKm: r.radius_km ?? undefined,
+    latitude: r.latitude ?? undefined,
+    longitude: r.longitude ?? undefined,
+    isActive: r.is_active,
+    createdAt: r.created_at,
+  };
+}
+
+export function rowToPortfolioItem(r: ProviderPortfolioRow): ProviderPortfolioItem {
+  return {
+    id: r.id,
+    providerId: r.provider_id,
+    mediaUrl: r.media_url,
+    thumbnailUrl: r.thumbnail_url ?? undefined,
+    caption: r.caption ?? undefined,
+    mediaType: r.media_type as ProviderPortfolioItem['mediaType'],
+    displayOrder: r.display_order,
+    isActive: r.is_active,
+    createdAt: r.created_at,
+  };
+}
+
+export function rowToTrustScoreLog(r: TrustScoreLogRow): TrustScoreLog {
+  return {
+    id: r.id,
+    providerId: r.provider_id,
+    score: r.score,
+    source: r.source as TrustScoreLog['source'],
+    adminId: r.admin_id ?? undefined,
+    overrideReason: r.override_reason ?? undefined,
+    compRating: r.comp_rating ?? undefined,
+    compCompletion: r.comp_completion ?? undefined,
+    compCancellation: r.comp_cancellation ?? undefined,
+    compInsurance: r.comp_insurance ?? undefined,
+    compLicense: r.comp_license ?? undefined,
+    compResponse: r.comp_response ?? undefined,
+    computedAt: r.computed_at,
+  };
+}
+
+export function rowToFraudFlag(r: FraudFlagRow): FraudFlag {
+  return {
+    id: r.id,
+    providerId: r.provider_id ?? undefined,
+    flagType: r.flag_type,
+    detail: r.detail ?? undefined,
+    status: r.status as FraudFlag['status'],
+    reviewedBy: r.reviewed_by ?? undefined,
+    reviewedAt: r.reviewed_at ?? undefined,
+    createdAt: r.created_at,
+  };
+}
+
+export function rowToNotification(r: NotificationRow): AppNotification {
+  return {
+    id: r.id,
+    userId: r.user_id,
+    type: r.type,
+    title: r.title,
+    body: r.body ?? undefined,
+    link: r.link ?? undefined,
+    isRead: r.is_read,
+    createdAt: r.created_at,
+  };
+}
+
+export function rowToReviewExtended(r: ReviewExtendedRow): ReviewExtended {
+  return {
+    id: r.id,
+    bookingId: r.booking_id,
+    reviewerId: r.reviewer_id,
+    reviewerName: r.reviewer_name ?? undefined,
+    providerId: r.provider_id,
+    rating: r.rating,
+    comment: r.comment ?? undefined,
+    createdAt: r.created_at,
+    commRating: r.comm_rating ?? undefined,
+    qualityRating: r.quality_rating ?? undefined,
+    punctualityRating: r.punctuality_rating ?? undefined,
+    providerResponse: r.provider_response ?? undefined,
+    providerRespondedAt: r.provider_responded_at ?? undefined,
+    flagged: r.flagged,
+    flaggedReason: r.flagged_reason ?? undefined,
+    isVisible: r.is_visible,
   };
 }
