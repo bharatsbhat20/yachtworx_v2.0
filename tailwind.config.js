@@ -1,0 +1,73 @@
+/** @type {import('tailwindcss').Config} */
+export default {
+  content: [
+    "./index.html",
+    "./src/**/*.{js,ts,jsx,tsx}",
+  ],
+  theme: {
+    extend: {
+      colors: {
+        navy: {
+          DEFAULT: '#0F1D3B',
+          50: '#E8EDF5',
+          100: '#C5D0E5',
+          200: '#8A9DC9',
+          300: '#4F6AAD',
+          400: '#2D4A8A',
+          500: '#0F1D3B',
+          600: '#0B1730',
+          700: '#081225',
+          800: '#050D1A',
+          900: '#02080F',
+        },
+        ocean: {
+          DEFAULT: '#1A6B9A',
+          50: '#E6F3FA',
+          100: '#BDE0F3',
+          200: '#80C3E8',
+          300: '#44A5DC',
+          400: '#1A88C4',
+          500: '#1A6B9A',
+          600: '#145678',
+          700: '#0E4057',
+          800: '#082B38',
+          900: '#04151B',
+        },
+        teal: {
+          DEFAULT: '#0D9B8A',
+          50: '#E5F7F5',
+          100: '#B8EBE6',
+          200: '#78D9D1',
+          300: '#38C7BC',
+          400: '#17B0A4',
+          500: '#0D9B8A',
+          600: '#0A7D6F',
+          700: '#075F55',
+          800: '#04403A',
+          900: '#02201D',
+        },
+        gold: {
+          DEFAULT: '#C9943A',
+          50: '#FDF6E9',
+          100: '#F9E8C3',
+          200: '#F3CC87',
+          300: '#EDB04A',
+          400: '#D9991D',
+          500: '#C9943A',
+          600: '#A8762D',
+          700: '#7D5821',
+          800: '#533A16',
+          900: '#291D0B',
+        },
+      },
+      fontFamily: {
+        heading: ['Space Grotesk', 'sans-serif'],
+        body: ['DM Sans', 'sans-serif'],
+        sans: ['DM Sans', 'sans-serif'],
+      },
+    },
+  },
+  plugins: [
+    require('@tailwindcss/forms'),
+  ],
+}

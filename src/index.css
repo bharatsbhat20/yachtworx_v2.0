@@ -1,0 +1,80 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply font-body text-navy-500 bg-gray-50 m-0 p-0;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-heading;
+  }
+  #root {
+    @apply w-full min-h-screen;
+    text-align: left;
+  }
+}
+
+@layer components {
+  .glass-card {
+    @apply bg-white/80 backdrop-blur-md border border-white/20 shadow-xl rounded-2xl;
+  }
+  .glass-card-dark {
+    @apply bg-navy-500/80 backdrop-blur-md border border-white/10 shadow-xl rounded-2xl;
+  }
+  .btn-hero {
+    @apply bg-gradient-to-r from-navy-500 to-ocean-500 text-white font-heading font-semibold px-8 py-4 rounded-xl hover:from-navy-600 hover:to-ocean-600 transition-all duration-300 shadow-lg hover:shadow-xl hover:-translate-y-0.5 inline-flex items-center gap-2 cursor-pointer;
+  }
+  .btn-ocean {
+    @apply bg-ocean-500 text-white font-heading font-semibold px-6 py-3 rounded-xl hover:bg-ocean-600 transition-all duration-200 inline-flex items-center gap-2 cursor-pointer;
+  }
+  .btn-gold {
+    @apply bg-gold-500 text-navy-500 font-heading font-semibold px-6 py-3 rounded-xl hover:bg-gold-400 transition-all duration-200 inline-flex items-center gap-2 cursor-pointer;
+  }
+  .btn-ghost {
+    @apply bg-transparent text-white font-heading font-semibold px-6 py-3 rounded-xl border border-white/30 hover:bg-white/10 transition-all duration-200 inline-flex items-center gap-2 cursor-pointer;
+  }
+  .btn-outline {
+    @apply bg-transparent text-ocean-500 font-heading font-semibold px-6 py-3 rounded-xl border-2 border-ocean-500 hover:bg-ocean-50 transition-all duration-200 inline-flex items-center gap-2 cursor-pointer;
+  }
+  .nav-link {
+    @apply text-navy-300 hover:text-white font-medium transition-colors duration-200 text-sm;
+  }
+  .status-good {
+    @apply bg-teal-50 text-teal-700 border border-teal-200;
+  }
+  .status-attention {
+    @apply bg-gold-50 text-gold-700 border border-gold-200;
+  }
+  .status-critical {
+    @apply bg-red-50 text-red-700 border border-red-200;
+  }
+  .page-container {
+    @apply min-h-screen bg-gray-50;
+  }
+  .section-padding {
+    @apply px-4 sm:px-6 lg:px-8;
+  }
+}
+
+@layer utilities {
+  .text-gradient {
+    @apply bg-gradient-to-r from-ocean-400 to-teal-400 bg-clip-text text-transparent;
+  }
+  .text-gradient-gold {
+    @apply bg-gradient-to-r from-gold-400 to-gold-300 bg-clip-text text-transparent;
+  }
+  .bg-hero-gradient {
+    background: linear-gradient(135deg, #0F1D3B 0%, #1A6B9A 50%, #0D9B8A 100%);
+  }
+  .bg-ocean-gradient {
+    background: linear-gradient(135deg, #082B38 0%, #1A6B9A 60%, #0D9B8A 100%);
+  }
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+}
