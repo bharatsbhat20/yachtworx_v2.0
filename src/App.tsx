@@ -1,5 +1,5 @@
-import React from 'react';
-import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { BrowserRouter, Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
 import { Navbar } from './components/layout/Navbar';
 import { Landing } from './pages/Landing';
@@ -13,34 +13,60 @@ import { ProviderLanding } from './pages/ProviderLanding';
 import { ProviderRegistration } from './pages/ProviderRegistration';
 import { ProviderDashboard } from './pages/ProviderDashboard';
 import { AuthPage } from './pages/AuthPage';
+import { useAuthStore } from './store/authStore';
 
 const noNavbarRoutes = ['/auth', '/register-provider'];
+
+// ─── ProtectedRoute ───────────────────────────────────────────────────────────
+// Redirects to /auth if the user is not authenticated.
+
+const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { isAuthenticated, isLoading } = useAuthStore();
+  if (isLoading) return null; // wait for initAuth to resolve
+  if (!isAuthenticated) return <Navigate to="/auth" replace />;
+  return <>{children}</>;
+};
+
+// ─── AppContent ───────────────────────────────────────────────────────────────
 
 const AppContent: React.FC = () => {
   const location = useLocation();
   const showNavbar = !noNavbarRoutes.includes(location.pathname);
+  const { initAuth } = useAuthStore();
+
+  // Restore Supabase session on first mount (no-op in demo mode)
+  useEffect(() => {
+    initAuth();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <>
       {showNavbar && <Navbar />}
       <AnimatePresence mode="wait">
         <Routes location={location} key={location.pathname}>
+          {/* Public */}
           <Route path="/" element={<Landing />} />
-          <Route path="/dashboard" element={<OwnerDashboard />} />
-          <Route path="/boats/:id" element={<BoatProfile />} />
-          <Route path="/marketplace" element={<Marketplace />} />
-          <Route path="/requests" element={<ServiceRequests />} />
-          <Route path="/documents" element={<Documents />} />
-          <Route path="/messages" element={<Messages />} />
           <Route path="/for-providers" element={<ProviderLanding />} />
-          <Route path="/register-provider" element={<ProviderRegistration />} />
-          <Route path="/provider-dashboard" element={<ProviderDashboard />} />
           <Route path="/auth" element={<AuthPage />} />
+          <Route path="/register-provider" element={<ProviderRegistration />} />
+
+          {/* Protected — owner */}
+          <Route path="/dashboard" element={<ProtectedRoute><OwnerDashboard /></ProtectedRoute>} />
+          <Route path="/boats/:id" element={<ProtectedRoute><BoatProfile /></ProtectedRoute>} />
+          <Route path="/marketplace" element={<ProtectedRoute><Marketplace /></ProtectedRoute>} />
+          <Route path="/requests" element={<ProtectedRoute><ServiceRequests /></ProtectedRoute>} />
+          <Route path="/documents" element={<ProtectedRoute><Documents /></ProtectedRoute>} />
+          <Route path="/messages" element={<ProtectedRoute><Messages /></ProtectedRoute>} />
+
+          {/* Protected — provider */}
+          <Route path="/provider-dashboard" element={<ProtectedRoute><ProviderDashboard /></ProtectedRoute>} />
         </Routes>
       </AnimatePresence>
     </>
   );
 };
+
+// ─── App ──────────────────────────────────────────────────────────────────────
 
 function App() {
   return (

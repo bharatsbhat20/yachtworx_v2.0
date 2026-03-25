@@ -164,10 +164,9 @@ export const Landing: React.FC = () => {
               Now serving 12,400+ vessels in 48 states
             </div>
             <h1 className="text-5xl sm:text-6xl lg:text-7xl font-heading font-bold text-white leading-tight mb-6">
-              Yacht Management,
-              <br />
+              Yacht management on{' '}
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-300 to-ocean-300">
-                Reimagined
+                easy mode
               </span>
             </h1>
             <p className="text-lg sm:text-xl text-white/70 max-w-2xl mx-auto mb-10 leading-relaxed">

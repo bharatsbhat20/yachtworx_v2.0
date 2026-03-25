@@ -20,6 +20,7 @@ import {
 import { clsx } from 'clsx';
 import { useAuthStore } from '../../store/authStore';
 import { Avatar } from '../ui/Avatar';
+import { isDemoMode } from '../../lib/supabase';
 
 const ownerNavLinks = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -122,7 +123,7 @@ export const Navbar: React.FC = () => {
                     className="flex items-center gap-2 p-1.5 rounded-xl hover:bg-white/10 transition-colors"
                   >
                     <Avatar
-                      src={currentUser.avatar}
+                      src={currentUser.avatarUrl ?? currentUser.avatar}
                       alt={currentUser.name}
                       fallback={currentUser.name}
                       size="sm"
@@ -155,20 +156,22 @@ export const Navbar: React.FC = () => {
                             {currentUser.role}
                           </span>
                         </div>
-                        <button
-                          onClick={handleSwitchRole}
-                          className="flex items-center gap-2.5 px-4 py-2.5 w-full text-sm text-gray-600 hover:bg-gray-50 transition-colors"
-                        >
-                          <RefreshCw size={14} className="text-ocean-500" />
-                          Switch to {currentUser.role === 'owner' ? 'Provider' : 'Owner'} Mode
-                        </button>
+                        {isDemoMode && (
+                          <button
+                            onClick={handleSwitchRole}
+                            className="flex items-center gap-2.5 px-4 py-2.5 w-full text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+                          >
+                            <RefreshCw size={14} className="text-ocean-500" />
+                            Switch to {currentUser.role === 'owner' ? 'Provider' : 'Owner'} Mode
+                          </button>
+                        )}
                         <button className="flex items-center gap-2.5 px-4 py-2.5 w-full text-sm text-gray-600 hover:bg-gray-50 transition-colors">
                           <Settings size={14} className="text-gray-400" />
                           Settings
                         </button>
                         <div className="border-t border-gray-100 mt-1 pt-1">
                           <button
-                            onClick={() => { logout(); navigate('/'); }}
+                            onClick={() => { logout().then(() => navigate('/')); }}
                             className="flex items-center gap-2.5 px-4 py-2.5 w-full text-sm text-red-500 hover:bg-red-50 transition-colors"
                           >
                             <LogOut size={14} />
@@ -225,15 +228,17 @@ export const Navbar: React.FC = () => {
               {currentUser && (
                 <>
                   <div className="border-t border-white/10 pt-3 mt-3">
+                    {isDemoMode && (
+                      <button
+                        onClick={handleSwitchRole}
+                        className="flex items-center gap-3 px-4 py-3 w-full rounded-xl text-sm font-medium text-white/70 hover:text-white hover:bg-white/10 transition-colors"
+                      >
+                        <RefreshCw size={18} />
+                        Switch to {currentUser.role === 'owner' ? 'Provider' : 'Owner'} Mode
+                      </button>
+                    )}
                     <button
-                      onClick={handleSwitchRole}
-                      className="flex items-center gap-3 px-4 py-3 w-full rounded-xl text-sm font-medium text-white/70 hover:text-white hover:bg-white/10 transition-colors"
-                    >
-                      <RefreshCw size={18} />
-                      Switch to {currentUser.role === 'owner' ? 'Provider' : 'Owner'} Mode
-                    </button>
-                    <button
-                      onClick={() => { logout(); navigate('/'); }}
+                      onClick={() => { logout().then(() => navigate('/')); }}
                       className="flex items-center gap-3 px-4 py-3 w-full rounded-xl text-sm font-medium text-red-400 hover:bg-red-500/10 transition-colors"
                     >
                       <LogOut size={18} />

@@ -1,6 +1,16 @@
-import React from 'react';
+/**
+ * Owner Dashboard — TRD §4.6 (health score), §6.6, §3.2 (add boat)
+ *
+ * Updates:
+ * - TRD-compliant health scores (calculateVesselHealth)
+ * - "Add Vessel" button launches AddBoatWizard
+ * - Fleet overview shows health band labels per TRD
+ * - Health bar color uses TRD band colors (green/amber/red)
+ */
+
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   Ship, Wrench, AlertTriangle, DollarSign, Plus, Calendar,
   ArrowRight, Bell, CheckCircle, Clock, ChevronRight
@@ -11,57 +21,70 @@ import { useServiceStore } from '../store/serviceStore';
 import { StatCard } from '../components/ui/StatCard';
 import { Badge } from '../components/ui/Badge';
 import { Card } from '../components/ui/Card';
+import { AddBoatWizard } from '../components/boats/AddBoatWizard';
+import { calculateVesselHealth } from '../utils/healthScore';
+import type { Boat } from '../types';
 
 export const OwnerDashboard: React.FC = () => {
   const { currentUser } = useAuthStore();
-  const { boats } = useBoatStore();
+  const { boats, getBoatsByOwner } = useBoatStore();
   const { requests } = useServiceStore();
 
-  const activeRequests = requests.filter(r => ['pending', 'matched', 'scheduled', 'in_progress'].includes(r.status));
-  const allAlerts = boats.flatMap(b => b.alerts);
+  const [addBoatOpen, setAddBoatOpen] = useState(false);
+
+  // Filter active boats for current user
+  const myBoats = currentUser
+    ? getBoatsByOwner(currentUser.id)
+    : boats.filter(b => !b.deletedAt);
+
+  const activeRequests = requests.filter(r =>
+    ['pending', 'matched', 'scheduled', 'in_progress'].includes(r.status)
+  );
+
+  const allAlerts = myBoats.flatMap(b => b.alerts);
   const criticalAlerts = allAlerts.filter(a => a.type === 'critical');
-  const nextService = boats
+
+  const nextService = myBoats
     .filter(b => b.nextService)
     .sort((a, b) => new Date(a.nextService!).getTime() - new Date(b.nextService!).getTime())[0];
 
-  const totalSpentThisYear = boats.flatMap(b => b.serviceHistory)
+  const totalSpentThisYear = myBoats
+    .flatMap(b => b.serviceHistory)
     .filter(s => s.status === 'completed' && s.date.startsWith('2024'))
     .reduce((sum, s) => sum + s.cost, 0);
 
-  const getStatusColor = (boat: typeof boats[0]) => {
-    const hasCritical = boat.alerts.some(a => a.type === 'critical');
-    const hasWarning = boat.alerts.some(a => a.type === 'warning');
-    if (hasCritical) return 'critical';
-    if (hasWarning) return 'attention';
+  // TRD §4.6: use calculateVesselHealth for fleet status
+  const getBoatStatusVariant = (boat: Boat) => {
+    const health = calculateVesselHealth(boat.id, boat.components);
+    if (health.band === 'needs_attention') return 'critical';
+    if (health.band === 'fair') return 'attention';
     return 'good';
   };
 
-  const getHealthScore = (boat: typeof boats[0]) => {
-    const criticalCount = boat.components.filter(c => c.status === 'critical').length;
-    const attentionCount = boat.components.filter(c => c.status === 'attention').length;
-    const total = boat.components.length;
-    return Math.round(((total - criticalCount * 2 - attentionCount) / total) * 100);
-  };
-
-  const recentActivity = boats.flatMap(b =>
-    b.serviceHistory.map(s => ({ ...s, boatName: b.name }))
-  ).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 5);
+  const recentActivity = myBoats
+    .flatMap(b => b.serviceHistory.map(s => ({ ...s, boatName: b.name })))
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    .slice(0, 5);
 
   const upcomingServices = requests
     .filter(r => r.status === 'scheduled')
     .concat(
-      boats.flatMap(b => b.serviceHistory.filter(s => s.status === 'scheduled').map(s => ({
-        id: s.id,
-        boatId: '',
-        boatName: b.name,
-        ownerId: 'user-1',
-        serviceType: s.type,
-        description: s.description,
-        status: 'scheduled' as const,
-        createdAt: s.date,
-        scheduledDate: s.date,
-        cost: s.cost,
-      })))
+      myBoats.flatMap(b =>
+        b.serviceHistory
+          .filter(s => s.status === 'scheduled')
+          .map(s => ({
+            id: s.id,
+            boatId: '',
+            boatName: b.name,
+            ownerId: 'user-1',
+            serviceType: s.type,
+            description: s.description,
+            status: 'scheduled' as const,
+            createdAt: s.date,
+            scheduledDate: s.date,
+            cost: s.cost,
+          }))
+      )
     );
 
   return (
@@ -90,7 +113,7 @@ export const OwnerDashboard: React.FC = () => {
         >
           <div>
             <h1 className="text-3xl font-heading font-bold text-navy-500">
-              Good morning, {currentUser?.name.split(' ')[0]}
+              Good morning, {currentUser?.firstName || currentUser?.name?.split(' ')[0]}
             </h1>
             <p className="text-gray-500 mt-1">Here's what's happening with your fleet today.</p>
           </div>
@@ -113,7 +136,7 @@ export const OwnerDashboard: React.FC = () => {
         >
           <StatCard
             label="Total Vessels"
-            value={boats.length}
+            value={myBoats.length}
             subtitle="In your fleet"
             icon={<Ship size={20} />}
           />
@@ -148,61 +171,92 @@ export const OwnerDashboard: React.FC = () => {
           >
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-heading font-semibold text-navy-500">Fleet Overview</h2>
-              <Link to="/marketplace" className="text-sm text-ocean-500 font-medium hover:text-ocean-600 flex items-center gap-1">
-                Add Vessel <Plus size={14} />
-              </Link>
+              {/* TRD §3.2: AddBoatWizard trigger */}
+              <button
+                onClick={() => setAddBoatOpen(true)}
+                className="text-sm text-ocean-500 font-medium hover:text-ocean-600 flex items-center gap-1 transition-colors"
+              >
+                <Plus size={14} /> Add Vessel
+              </button>
             </div>
-            <div className="space-y-4">
-              {boats.map((boat) => {
-                const status = getStatusColor(boat);
-                const health = getHealthScore(boat);
-                return (
-                  <Link key={boat.id} to={`/boats/${boat.id}`}>
-                    <Card hover className="transition-all">
-                      <div className="flex items-start gap-4">
-                        <div className="w-20 h-16 rounded-xl overflow-hidden flex-shrink-0 bg-gradient-to-br from-ocean-500 to-navy-500">
-                          {boat.image && (
-                            <img src={boat.image} alt={boat.name} className="w-full h-full object-cover" />
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-start justify-between gap-2">
-                            <div>
-                              <h3 className="font-heading font-semibold text-navy-500">{boat.name}</h3>
-                              <p className="text-sm text-gray-500">{boat.year} {boat.make} {boat.model} · {boat.length}'</p>
-                              <p className="text-xs text-gray-400 mt-0.5">{boat.homePort}</p>
-                            </div>
-                            <Badge variant={status} dot>
-                              {status === 'good' ? 'Good' : status === 'attention' ? 'Needs Attention' : 'Critical'}
-                            </Badge>
-                          </div>
-                          <div className="flex items-center gap-4 mt-3">
-                            <div className="flex items-center gap-2 flex-1">
-                              <div className="flex-1 bg-gray-100 rounded-full h-1.5">
-                                <div
-                                  className={`h-1.5 rounded-full ${health >= 80 ? 'bg-teal-500' : health >= 60 ? 'bg-gold-500' : 'bg-red-500'}`}
-                                  style={{ width: `${health}%` }}
-                                />
-                              </div>
-                              <span className="text-xs font-semibold text-navy-500 whitespace-nowrap">
-                                {health}% Health
-                              </span>
-                            </div>
-                            {boat.alerts.length > 0 && (
-                              <div className="flex items-center gap-1 text-xs text-amber-600">
-                                <Bell size={12} />
-                                {boat.alerts.length} alert{boat.alerts.length > 1 ? 's' : ''}
-                              </div>
+
+            {myBoats.length === 0 ? (
+              <div
+                onClick={() => setAddBoatOpen(true)}
+                className="border-2 border-dashed border-gray-200 rounded-2xl p-12 text-center cursor-pointer hover:border-ocean-300 hover:bg-gray-50 transition-all"
+              >
+                <Ship size={40} className="text-gray-300 mx-auto mb-3" />
+                <p className="text-gray-500 font-medium mb-1">No vessels yet</p>
+                <p className="text-sm text-gray-400 mb-4">Add your first boat to get started</p>
+                <button className="btn-ocean text-sm py-2 px-4">
+                  <Plus size={14} /> Add Your First Vessel
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {myBoats.map((boat) => {
+                  // TRD §4.6: calculateVesselHealth for each boat
+                  const health = calculateVesselHealth(boat.id, boat.components);
+                  const statusVariant = getBoatStatusVariant(boat);
+
+                  return (
+                    <Link key={boat.id} to={`/boats/${boat.id}`}>
+                      <Card hover className="transition-all">
+                        <div className="flex items-start gap-4">
+                          <div className="w-20 h-16 rounded-xl overflow-hidden flex-shrink-0 bg-gradient-to-br from-ocean-500 to-navy-500">
+                            {(boat.photoUrl || boat.image) && (
+                              <img
+                                src={boat.photoUrl || boat.image}
+                                alt={boat.name}
+                                className="w-full h-full object-cover"
+                              />
                             )}
                           </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between gap-2">
+                              <div>
+                                <h3 className="font-heading font-semibold text-navy-500">{boat.name}</h3>
+                                <p className="text-sm text-gray-500">
+                                  {boat.year} {boat.make} {boat.model}
+                                  {(boat.lengthOverall || boat.length) && ` · ${boat.lengthOverall || boat.length}'`}
+                                </p>
+                                <p className="text-xs text-gray-400 mt-0.5">{boat.homePort}</p>
+                              </div>
+                              <Badge variant={statusVariant} dot>
+                                {health.bandLabel}
+                              </Badge>
+                            </div>
+                            <div className="flex items-center gap-4 mt-3">
+                              <div className="flex items-center gap-2 flex-1">
+                                <div className="flex-1 bg-gray-100 rounded-full h-1.5">
+                                  <div
+                                    className="h-1.5 rounded-full transition-all duration-500"
+                                    style={{
+                                      width: `${health.score}%`,
+                                      backgroundColor: health.bandColor,
+                                    }}
+                                  />
+                                </div>
+                                <span className="text-xs font-semibold whitespace-nowrap" style={{ color: health.bandColor }}>
+                                  {health.score} Health
+                                </span>
+                              </div>
+                              {boat.alerts.length > 0 && (
+                                <div className="flex items-center gap-1 text-xs text-amber-600">
+                                  <Bell size={12} />
+                                  {boat.alerts.length} alert{boat.alerts.length > 1 ? 's' : ''}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          <ChevronRight size={16} className="text-gray-300 flex-shrink-0 mt-1" />
                         </div>
-                        <ChevronRight size={16} className="text-gray-300 flex-shrink-0 mt-1" />
-                      </div>
-                    </Card>
-                  </Link>
-                );
-              })}
-            </div>
+                      </Card>
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
           </motion.div>
 
           {/* Sidebar */}
@@ -216,32 +270,43 @@ export const OwnerDashboard: React.FC = () => {
             <Card>
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-heading font-semibold text-navy-500">Alerts</h3>
-                <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-semibold">
-                  {allAlerts.length}
-                </span>
+                {allAlerts.length > 0 && (
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
+                    criticalAlerts.length > 0 ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-600'
+                  }`}>
+                    {allAlerts.length}
+                  </span>
+                )}
               </div>
-              <div className="space-y-3">
-                {allAlerts.slice(0, 4).map((alert) => (
-                  <div key={alert.id} className="flex items-start gap-3">
-                    <div className={`mt-0.5 flex-shrink-0 ${
-                      alert.type === 'critical' ? 'text-red-500' :
-                      alert.type === 'warning' ? 'text-amber-500' : 'text-ocean-500'
-                    }`}>
-                      {alert.type === 'critical' ? <AlertTriangle size={14} /> :
-                       alert.type === 'warning' ? <Bell size={14} /> :
-                       <CheckCircle size={14} />}
+              {allAlerts.length === 0 ? (
+                <div className="text-center py-4">
+                  <CheckCircle size={24} className="text-teal-400 mx-auto mb-2" />
+                  <p className="text-sm text-gray-400">All clear — no alerts</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {allAlerts.slice(0, 4).map((alert) => (
+                    <div key={alert.id} className="flex items-start gap-3">
+                      <div className={`mt-0.5 flex-shrink-0 ${
+                        alert.type === 'critical' ? 'text-red-500' :
+                        alert.type === 'warning' ? 'text-amber-500' : 'text-ocean-500'
+                      }`}>
+                        {alert.type === 'critical' ? <AlertTriangle size={14} /> :
+                         alert.type === 'warning' ? <Bell size={14} /> :
+                         <CheckCircle size={14} />}
+                      </div>
+                      <div>
+                        <p className="text-sm text-navy-500 font-medium leading-snug">{alert.message}</p>
+                        {alert.dueDate && (
+                          <p className="text-xs text-gray-400 mt-0.5">
+                            Due: {new Date(alert.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                          </p>
+                        )}
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-sm text-navy-500 font-medium leading-snug">{alert.message}</p>
-                      {alert.dueDate && (
-                        <p className="text-xs text-gray-400 mt-0.5">
-                          Due: {new Date(alert.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </Card>
 
             {/* Upcoming Services */}
@@ -250,24 +315,28 @@ export const OwnerDashboard: React.FC = () => {
                 <h3 className="font-heading font-semibold text-navy-500">Upcoming</h3>
                 <Link to="/requests" className="text-xs text-ocean-500 hover:text-ocean-600">View all</Link>
               </div>
-              <div className="space-y-3">
-                {upcomingServices.slice(0, 3).map((svc) => (
-                  <div key={svc.id} className="flex items-start gap-3">
-                    <div className="p-2 bg-ocean-50 rounded-lg flex-shrink-0">
-                      <Clock size={14} className="text-ocean-500" />
+              {upcomingServices.length === 0 ? (
+                <p className="text-sm text-gray-400 text-center py-3">No upcoming services</p>
+              ) : (
+                <div className="space-y-3">
+                  {upcomingServices.slice(0, 3).map((svc) => (
+                    <div key={svc.id} className="flex items-start gap-3">
+                      <div className="p-2 bg-ocean-50 rounded-lg flex-shrink-0">
+                        <Clock size={14} className="text-ocean-500" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-navy-500 leading-snug">{svc.serviceType}</p>
+                        <p className="text-xs text-gray-400">{svc.boatName}</p>
+                        {svc.scheduledDate && (
+                          <p className="text-xs text-ocean-500 mt-0.5">
+                            {new Date(svc.scheduledDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                          </p>
+                        )}
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-sm font-medium text-navy-500 leading-snug">{svc.serviceType}</p>
-                      <p className="text-xs text-gray-400">{svc.boatName}</p>
-                      {svc.scheduledDate && (
-                        <p className="text-xs text-ocean-500 mt-0.5">
-                          {new Date(svc.scheduledDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </Card>
 
             {/* Quick Actions */}
@@ -275,20 +344,32 @@ export const OwnerDashboard: React.FC = () => {
               <h3 className="font-heading font-semibold text-navy-500 mb-4">Quick Actions</h3>
               <div className="space-y-2">
                 {[
+                  { label: 'Add a New Vessel', action: () => setAddBoatOpen(true), icon: Ship },
                   { label: 'Request a Service', to: '/requests', icon: Wrench },
-                  { label: 'Find a Provider', to: '/marketplace', icon: Ship },
-                  { label: 'Upload Document', to: '/documents', icon: ArrowRight },
+                  { label: 'Find a Provider', to: '/marketplace', icon: ArrowRight },
                   { label: 'View Messages', to: '/messages', icon: ArrowRight },
-                ].map((action) => (
-                  <Link
-                    key={action.label}
-                    to={action.to}
-                    className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-50 transition-colors group"
-                  >
-                    <action.icon size={16} className="text-ocean-500" />
-                    <span className="text-sm text-navy-500 font-medium flex-1">{action.label}</span>
-                    <ChevronRight size={14} className="text-gray-300 group-hover:text-gray-400 transition-colors" />
-                  </Link>
+                ].map((item) => (
+                  item.action ? (
+                    <button
+                      key={item.label}
+                      onClick={item.action}
+                      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-50 transition-colors group text-left"
+                    >
+                      <item.icon size={16} className="text-ocean-500" />
+                      <span className="text-sm text-navy-500 font-medium flex-1">{item.label}</span>
+                      <ChevronRight size={14} className="text-gray-300 group-hover:text-gray-400" />
+                    </button>
+                  ) : (
+                    <Link
+                      key={item.label}
+                      to={item.to!}
+                      className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-50 transition-colors group"
+                    >
+                      <item.icon size={16} className="text-ocean-500" />
+                      <span className="text-sm text-navy-500 font-medium flex-1">{item.label}</span>
+                      <ChevronRight size={14} className="text-gray-300 group-hover:text-gray-400" />
+                    </Link>
+                  )
                 ))}
               </div>
             </Card>
@@ -314,7 +395,7 @@ export const OwnerDashboard: React.FC = () => {
                 <div key={activity.id} className="flex items-center gap-4 py-3 first:pt-0 last:pb-0">
                   <div className={`p-2 rounded-lg flex-shrink-0 ${
                     activity.status === 'completed' ? 'bg-teal-50' :
-                    activity.status === 'scheduled' ? 'bg-ocean-50' : 'bg-gold-50'
+                    activity.status === 'scheduled' ? 'bg-ocean-50' : 'bg-amber-50'
                   }`}>
                     {activity.status === 'completed'
                       ? <CheckCircle size={14} className="text-teal-500" />
@@ -333,7 +414,10 @@ export const OwnerDashboard: React.FC = () => {
                       {new Date(activity.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                     </p>
                   </div>
-                  <Badge variant={activity.status === 'completed' ? 'good' : activity.status === 'scheduled' ? 'ocean' : 'attention'}>
+                  <Badge variant={
+                    activity.status === 'completed' ? 'good' :
+                    activity.status === 'scheduled' ? 'ocean' : 'attention'
+                  }>
                     {activity.status}
                   </Badge>
                 </div>
@@ -342,6 +426,11 @@ export const OwnerDashboard: React.FC = () => {
           </Card>
         </motion.div>
       </div>
+
+      {/* Add Boat Wizard */}
+      <AnimatePresence>
+        {addBoatOpen && <AddBoatWizard onClose={() => setAddBoatOpen(false)} />}
+      </AnimatePresence>
     </div>
   );
 };

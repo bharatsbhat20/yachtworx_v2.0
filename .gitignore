@@ -1,3 +1,6 @@
+# Claude Code local config (machine-specific)
+.claude/
+
 # Logs
 logs
 *.log
@@ -11,6 +14,10 @@ node_modules
 dist
 dist-ssr
 *.local
+
+# Environment secrets — copy .env.example → .env.local and fill in your values
+.env.local
+.env.*.local
 
 # Editor directories and files
 .vscode/*

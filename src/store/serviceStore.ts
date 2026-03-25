@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { ServiceRequest, ServiceProvider } from '../types';
-import { mockServiceRequests, mockProviders } from '../data/mockData';
+import { mockRequests, mockProviders } from '../data/mockData';
 
 interface ServiceState {
   requests: ServiceRequest[];
@@ -11,7 +11,7 @@ interface ServiceState {
 }
 
 export const useServiceStore = create<ServiceState>((set) => ({
-  requests: mockServiceRequests,
+  requests: mockRequests,
   providers: mockProviders,
   selectedRequest: null,
   selectRequest: (id) =>
