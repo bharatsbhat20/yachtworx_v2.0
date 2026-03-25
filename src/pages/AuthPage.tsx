@@ -194,13 +194,13 @@ export const AuthPage: React.FC = () => {
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('james@yachtworx.io');
   const [password, setPassword] = useState('Password1');
-  const [role, setRole] = useState<'owner' | 'provider'>('owner');
+  const [role, setRole] = useState<'owner' | 'provider' | 'admin'>('owner');
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     clearError();
     await login(email, password, role);
-    navigate(role === 'owner' ? '/dashboard' : '/provider-dashboard');
+    navigate(role === 'provider' ? '/provider-dashboard' : role === 'admin' ? '/admin' : '/dashboard');
   };
 
   const handleSignup = async (e: React.FormEvent) => {
@@ -295,21 +295,26 @@ export const AuthPage: React.FC = () => {
             {mode === 'login' ? 'Sign in to manage your fleet' : 'Join thousands of yacht owners and professionals'}
           </p>
 
-          {/* Role Selector (TRD 3.1 — role selection at registration) */}
-          <div className="flex gap-3 mb-6">
-            {(['owner', 'provider'] as const).map(r => (
+          {/* Role Selector */}
+          <div className="flex gap-2 mb-6">
+            {([
+              { value: 'owner',    label: 'Boat Owner',       color: 'border-ocean-500 bg-ocean-50 text-ocean-700' },
+              { value: 'provider', label: 'Service Provider', color: 'border-teal-500 bg-teal-50 text-teal-700' },
+              { value: 'admin',    label: 'Admin',            color: 'border-navy-500 bg-navy-50 text-navy-700' },
+            ] as const).map(({ value, label, color }) => (
               <button
-                key={r}
-                onClick={() => setRole(r)}
-                className={`flex-1 p-3 rounded-xl border-2 text-sm font-medium transition-all text-center ${
-                  role === r
-                    ? r === 'owner'
-                      ? 'border-ocean-500 bg-ocean-50 text-ocean-700'
-                      : 'border-teal-500 bg-teal-50 text-teal-700'
-                    : 'border-gray-200 text-gray-500 hover:border-gray-300'
+                key={value}
+                onClick={() => {
+                  setRole(value);
+                  if (value === 'owner')    setEmail('james@yachtworx.io');
+                  if (value === 'provider') setEmail('provider@yachtworx.com');
+                  if (value === 'admin')    setEmail('admin@yachtworx.com');
+                }}
+                className={`flex-1 p-3 rounded-xl border-2 text-xs font-medium transition-all text-center ${
+                  role === value ? color : 'border-gray-200 text-gray-500 hover:border-gray-300'
                 }`}
               >
-                {r === 'owner' ? 'Boat Owner' : 'Service Provider'}
+                {label}
               </button>
             ))}
           </div>
@@ -457,10 +462,20 @@ export const AuthPage: React.FC = () => {
             </p>
           </div>
 
-          <div className="mt-6 pt-6 border-t border-gray-100 text-center">
-            <p className="text-xs text-gray-400">
-              Demo mode: use <span className="font-mono text-gray-500">james@yachtworx.io</span> / <span className="font-mono text-gray-500">Password1</span>
-            </p>
+          <div className="mt-6 pt-6 border-t border-gray-100">
+            <p className="text-xs text-gray-400 text-center mb-2">Demo accounts (password: <span className="font-mono text-gray-500">Password1</span>)</p>
+            <div className="space-y-1">
+              {[
+                { role: 'Owner',    email: 'james@yachtworx.io',       color: 'text-ocean-600' },
+                { role: 'Provider', email: 'provider@yachtworx.com',   color: 'text-teal-600' },
+                { role: 'Admin',    email: 'admin@yachtworx.com',      color: 'text-navy-500' },
+              ].map(({ role, email, color }) => (
+                <div key={role} className="flex items-center justify-between text-xs">
+                  <span className={`font-medium ${color}`}>{role}</span>
+                  <span className="font-mono text-gray-400">{email}</span>
+                </div>
+              ))}
+            </div>
           </div>
         </motion.div>
 

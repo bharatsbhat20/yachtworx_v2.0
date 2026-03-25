@@ -58,14 +58,29 @@ const defaultOwner: User = {
 const defaultProvider: User = {
   id: 'prov-1',
   firstName: 'Marcus',
-  lastName: 'Chen',
-  name: 'Marcus Chen',
-  email: 'marcus@pacificmarine.com',
+  lastName: 'Rivera',
+  name: 'Marcus Rivera',
+  email: 'provider@yachtworx.com',
   role: 'provider',
   emailVerified: true,
-  avatarUrl: 'https://randomuser.me/api/portraits/men/32.jpg',
-  avatar: 'https://randomuser.me/api/portraits/men/32.jpg',
-  phone: '+1 310 555 0233',
+  avatarUrl: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=200&h=200&fit=crop',
+  avatar: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=200&h=200&fit=crop',
+  phone: '+1 310 555 0101',
+  createdAt: '2024-01-01T00:00:00Z',
+  updatedAt: '2024-01-01T00:00:00Z',
+};
+
+const defaultAdmin: User = {
+  id: 'admin-1',
+  firstName: 'Admin',
+  lastName: 'User',
+  name: 'Admin User',
+  email: 'admin@yachtworx.com',
+  role: 'admin',
+  emailVerified: true,
+  avatarUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=200&h=200&fit=crop',
+  avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=200&h=200&fit=crop',
+  phone: '+1 310 555 0999',
   createdAt: '2024-01-01T00:00:00Z',
   updatedAt: '2024-01-01T00:00:00Z',
 };
@@ -190,11 +205,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
     if (isDemoMode || !supabase) {
       await new Promise(r => setTimeout(r, 800));
-      const user = role === 'owner'
-        ? { ...defaultOwner, email }
-        : { ...defaultProvider, email };
+      const base =
+        role === 'owner'    ? defaultOwner :
+        role === 'provider' ? defaultProvider :
+                              defaultAdmin;
       set({
-        currentUser: user,
+        currentUser: { ...base, email },
         isAuthenticated: true,
         emailVerified: true,
         authFlow: 'authenticated',
@@ -410,9 +426,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   // ── switchRole (demo only) ──────────────────────────────────────────────────
   switchRole: (role) => {
     if (!isDemoMode) return; // no-op in live mode
-    set({
-      currentUser: role === 'owner' ? defaultOwner : defaultProvider,
-    });
+    const user =
+      role === 'owner'    ? defaultOwner :
+      role === 'provider' ? defaultProvider :
+                            defaultAdmin;
+    set({ currentUser: user });
   },
 
   clearError: () => set({ authError: null }),

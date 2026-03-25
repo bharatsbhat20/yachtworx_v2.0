@@ -16,25 +16,31 @@ import {
   Settings,
   RefreshCw,
   Bell,
+  Shield,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useAuthStore } from '../../store/authStore';
+import type { UserRole } from '../../types';
 import { Avatar } from '../ui/Avatar';
 import { isDemoMode } from '../../lib/supabase';
 
 const ownerNavLinks = [
-  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { to: '/boats/boat-1', label: 'My Boats', icon: Ship },
-  { to: '/marketplace', label: 'Marketplace', icon: ShoppingBag },
-  { to: '/requests', label: 'Services', icon: ClipboardList },
-  { to: '/messages', label: 'Messages', icon: MessageSquare },
-  { to: '/documents', label: 'Documents', icon: FileText },
+  { to: '/dashboard',       label: 'Dashboard',  icon: LayoutDashboard },
+  { to: '/boats/boat-1',    label: 'My Boats',   icon: Ship },
+  { to: '/marketplace',     label: 'Marketplace',icon: ShoppingBag },
+  { to: '/requests',        label: 'Services',   icon: ClipboardList },
+  { to: '/messages',        label: 'Messages',   icon: MessageSquare },
+  { to: '/documents',       label: 'Documents',  icon: FileText },
 ];
 
 const providerNavLinks = [
   { to: '/provider-dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { to: '/requests', label: 'Jobs', icon: ClipboardList },
-  { to: '/messages', label: 'Messages', icon: MessageSquare },
+  { to: '/requests',           label: 'Jobs',       icon: ClipboardList },
+  { to: '/messages',           label: 'Messages',   icon: MessageSquare },
+];
+
+const adminNavLinks = [
+  { to: '/admin', label: 'Admin Panel', icon: Shield },
 ];
 
 export const Navbar: React.FC = () => {
@@ -58,13 +64,29 @@ export const Navbar: React.FC = () => {
     setProfileOpen(false);
   }, [location]);
 
-  const navLinks = currentUser?.role === 'provider' ? providerNavLinks : ownerNavLinks;
+  const navLinks =
+    currentUser?.role === 'provider' ? providerNavLinks :
+    currentUser?.role === 'admin'    ? adminNavLinks :
+    ownerNavLinks;
 
   const handleSwitchRole = () => {
-    const newRole = currentUser?.role === 'owner' ? 'provider' : 'owner';
+    const cycle: Record<string, UserRole> = { owner: 'provider', provider: 'admin', admin: 'owner' };
+    const newRole: UserRole = cycle[currentUser?.role ?? 'owner'] ?? 'owner';
     switchRole(newRole);
-    navigate(newRole === 'provider' ? '/provider-dashboard' : '/dashboard');
+    const dest = newRole === 'provider' ? '/provider-dashboard' : newRole === 'admin' ? '/admin' : '/dashboard';
+    navigate(dest);
     setProfileOpen(false);
+  };
+
+  const handleLogout = async () => {
+    setProfileOpen(false);
+    setMobileOpen(false);
+    try {
+      await logout();
+    } catch (_) {
+      // ignore errors — always navigate away
+    }
+    navigate('/');
   };
 
   return (
@@ -162,7 +184,7 @@ export const Navbar: React.FC = () => {
                             className="flex items-center gap-2.5 px-4 py-2.5 w-full text-sm text-gray-600 hover:bg-gray-50 transition-colors"
                           >
                             <RefreshCw size={14} className="text-ocean-500" />
-                            Switch to {currentUser.role === 'owner' ? 'Provider' : 'Owner'} Mode
+                            Switch to {currentUser.role === 'owner' ? 'Provider' : currentUser.role === 'provider' ? 'Admin' : 'Owner'} Mode
                           </button>
                         )}
                         <button className="flex items-center gap-2.5 px-4 py-2.5 w-full text-sm text-gray-600 hover:bg-gray-50 transition-colors">
@@ -171,7 +193,7 @@ export const Navbar: React.FC = () => {
                         </button>
                         <div className="border-t border-gray-100 mt-1 pt-1">
                           <button
-                            onClick={() => { logout().then(() => navigate('/')); }}
+                            onClick={handleLogout}
                             className="flex items-center gap-2.5 px-4 py-2.5 w-full text-sm text-red-500 hover:bg-red-50 transition-colors"
                           >
                             <LogOut size={14} />
@@ -234,11 +256,11 @@ export const Navbar: React.FC = () => {
                         className="flex items-center gap-3 px-4 py-3 w-full rounded-xl text-sm font-medium text-white/70 hover:text-white hover:bg-white/10 transition-colors"
                       >
                         <RefreshCw size={18} />
-                        Switch to {currentUser.role === 'owner' ? 'Provider' : 'Owner'} Mode
+                        Switch to {currentUser.role === 'owner' ? 'Provider' : currentUser.role === 'provider' ? 'Admin' : 'Owner'} Mode
                       </button>
                     )}
                     <button
-                      onClick={() => { logout().then(() => navigate('/')); }}
+                      onClick={handleLogout}
                       className="flex items-center gap-3 px-4 py-3 w-full rounded-xl text-sm font-medium text-red-400 hover:bg-red-500/10 transition-colors"
                     >
                       <LogOut size={18} />

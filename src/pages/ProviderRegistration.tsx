@@ -7,6 +7,7 @@ import {
   Eye, EyeOff, Phone, Mail, Lock, Anchor,
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
+import { isDemoMode } from '../lib/supabase';
 import { SERVICE_CATEGORIES } from '../types';
 
 // ─── Steps ────────────────────────────────────────────────────────────────────
@@ -53,7 +54,7 @@ const slideVariants = {
 
 export default function ProviderRegistration() {
   const navigate = useNavigate();
-  const { register, isDemoMode } = useAuthStore();
+  const { register } = useAuthStore();
 
   const [step, setStep] = useState(1);
   const [direction, setDirection] = useState(1);
@@ -103,7 +104,9 @@ export default function ProviderRegistration() {
     if (!validateStep()) return;
     setSubmitting(true); setSubmitError('');
     try {
-      await register(form.email, form.password, {
+      await register({
+        email: form.email,
+        password: form.password,
         firstName: form.contactName.split(' ')[0],
         lastName: form.contactName.split(' ').slice(1).join(' ') || '',
         role: 'provider',
