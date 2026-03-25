@@ -434,5 +434,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   clearError: () => set({ authError: null }),
-  setFlow: (flow) => set({ authFlow: flow }),
+  setFlow: (flow) => set({
+    authFlow: flow,
+    // When returning to idle, also clear pendingEmail so the verification
+    // screen can't re-appear for a different user visiting /auth later.
+    ...(flow === 'idle' ? { pendingEmail: null, authError: null } : {}),
+  }),
 }));

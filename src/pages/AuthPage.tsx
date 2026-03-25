@@ -64,10 +64,15 @@ const EmailVerificationScreen: React.FC<{ email: string }> = ({ email }) => {
     setTimeout(() => setCanResend(true), 60000);
   };
 
-  // Demo: skip verification
-  const handleSkip = async () => {
-    await verifyEmail('demo');
-    navigate('/dashboard');
+  // Demo: skip verification — just reset the flow so the login form reappears.
+  // (verifyEmail creates a generic "New User"; using the login form is cleaner.)
+  const handleSkip = () => {
+    setFlow('idle');
+  };
+
+  // Back to sign in — resets any stale verify_email / error state
+  const handleBackToSignIn = () => {
+    setFlow('idle');
   };
 
   return (
@@ -117,8 +122,16 @@ const EmailVerificationScreen: React.FC<{ email: string }> = ({ email }) => {
         {resent && !canResend ? 'Email resent — check your inbox' : 'Resend verification email'}
       </button>
 
+      {/* Back to sign in */}
+      <button
+        onClick={handleBackToSignIn}
+        className="text-sm text-ocean-500 hover:text-ocean-600 font-medium w-full text-center"
+      >
+        ← Back to Sign In
+      </button>
+
       {/* Demo shortcut */}
-      <div className="mt-6 pt-4 border-t border-gray-100">
+      <div className="mt-4 pt-4 border-t border-gray-100">
         <p className="text-xs text-gray-400 mb-2">Demo mode</p>
         <button onClick={handleSkip} className="text-xs text-ocean-500 hover:underline">
           Skip verification (demo only) →
@@ -183,7 +196,7 @@ const ForgotPasswordScreen: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 
 export const AuthPage: React.FC = () => {
   const navigate = useNavigate();
-  const { login, register, authFlow, pendingEmail, isLoading, authError, clearError } = useAuthStore();
+  const { login, register, authFlow, pendingEmail, isLoading, authError, clearError, setFlow } = useAuthStore();
 
   const [mode, setMode] = useState<'login' | 'signup'>('login');
   const [showPassword, setShowPassword] = useState(false);
@@ -198,6 +211,8 @@ export const AuthPage: React.FC = () => {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    // Reset any stale verify_email / error flow before attempting login
+    setFlow('idle');
     clearError();
     await login(email, password, role);
     navigate(role === 'provider' ? '/provider-dashboard' : role === 'admin' ? '/admin' : '/dashboard');
