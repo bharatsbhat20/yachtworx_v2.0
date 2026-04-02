@@ -5,9 +5,12 @@ import {
   DollarSign, Star, Briefcase, TrendingUp, Clock, CheckCircle,
   AlertCircle, Shield, FileText, MapPin, Image, Bell, Settings,
   ExternalLink, ChevronRight, RefreshCw, BarChart2, MessageSquare,
+  Sparkles,
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { useProviderOnboardingStore } from '../store/providerOnboardingStore';
+import { useMatchStore } from '../store/matchStore';
+import { RecommendedJobsFeed } from '../components/matching/RecommendedJobsFeed';
 import TrustScoreCard from '../components/provider/TrustScoreCard';
 import DocumentUploadModal from '../components/provider/DocumentUploadModal';
 import ServiceAreaManager from '../components/provider/ServiceAreaManager';
@@ -15,7 +18,7 @@ import PortfolioGrid from '../components/provider/PortfolioGrid';
 import { VERIFICATION_STATUS_LABELS, VERIFICATION_STATUS_COLORS, DOCUMENT_TYPE_LABELS } from '../types';
 import type { ProviderDocument } from '../types';
 
-type Tab = 'overview' | 'documents' | 'service-areas' | 'portfolio' | 'reviews' | 'settings';
+type Tab = 'overview' | 'documents' | 'service-areas' | 'portfolio' | 'reviews' | 'settings' | 'recommended-jobs';
 
 // ─── Stat card ────────────────────────────────────────────────────────────────
 
@@ -55,6 +58,11 @@ export default function ProviderDashboard() {
     markNotificationRead, respondToReview,
   } = useProviderOnboardingStore();
 
+  const {
+    providerJobMatches, expressedInterest, isComputing: isComputingMatches,
+    computeMatchesForProvider, expressInterest,
+  } = useMatchStore();
+
   const [activeTab, setActiveTab] = useState<Tab>('overview');
   const [showDocUpload, setShowDocUpload] = useState(false);
   const [respondingTo, setRespondingTo] = useState<string | null>(null);
@@ -71,6 +79,13 @@ export default function ProviderDashboard() {
     fetchNotifications(providerId);
     fetchReviews(providerId);
   }, [providerId]);
+
+  // Lazy-compute recommended jobs on first visit to that tab
+  useEffect(() => {
+    if (activeTab === 'recommended-jobs' && providerJobMatches.length === 0 && !isComputingMatches) {
+      computeMatchesForProvider(providerId);
+    }
+  }, [activeTab]);
 
   if (profileLoading) {
     return (
@@ -104,12 +119,13 @@ export default function ProviderDashboard() {
   const hasInsurance = approvedDocs.some((d) => d.documentType === 'insurance_coi');
 
   const TABS: { id: Tab; label: string; icon: React.ElementType; badge?: number }[] = [
-    { id: 'overview',      label: 'Overview',     icon: BarChart2 },
-    { id: 'documents',     label: 'Documents',    icon: FileText,  badge: pendingDocs.length },
-    { id: 'service-areas', label: 'Service Areas',icon: MapPin },
-    { id: 'portfolio',     label: 'Portfolio',    icon: Image },
-    { id: 'reviews',       label: 'Reviews',      icon: Star },
-    { id: 'settings',      label: 'Settings',     icon: Settings },
+    { id: 'overview',          label: 'Overview',         icon: BarChart2 },
+    { id: 'recommended-jobs',  label: 'Recommended Jobs', icon: Sparkles, badge: providerJobMatches.length || undefined },
+    { id: 'documents',         label: 'Documents',        icon: FileText, badge: pendingDocs.length },
+    { id: 'service-areas',     label: 'Service Areas',    icon: MapPin },
+    { id: 'portfolio',         label: 'Portfolio',        icon: Image },
+    { id: 'reviews',           label: 'Reviews',          icon: Star },
+    { id: 'settings',          label: 'Settings',         icon: Settings },
   ];
 
   const latestLog = trustScoreLogs[0];
@@ -326,6 +342,29 @@ export default function ProviderDashboard() {
                     </div>
                   </div>
 
+                  {/* Match Insights teaser */}
+                  <div className="bg-gradient-to-br from-ocean-50 to-teal-50 rounded-xl border border-ocean-100 p-5 flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2.5 bg-ocean-100 rounded-xl">
+                        <Sparkles className="w-5 h-5 text-ocean-600" />
+                      </div>
+                      <div>
+                        <p className="font-semibold text-navy-700">Smart Job Matches</p>
+                        <p className="text-sm text-gray-500 mt-0.5">
+                          {providerJobMatches.length > 0
+                            ? `${providerJobMatches.length} job${providerJobMatches.length !== 1 ? 's' : ''} matched to your skills & location`
+                            : 'View AI-ranked job opportunities near you'}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setActiveTab('recommended-jobs')}
+                      className="flex items-center gap-1.5 px-4 py-2 bg-ocean-600 text-white text-sm font-medium rounded-lg hover:bg-ocean-700 transition-colors whitespace-nowrap flex-shrink-0"
+                    >
+                      View Jobs <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
+
                   {/* Recent reviews */}
                   {reviews.length > 0 && (
                     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
@@ -519,6 +558,16 @@ export default function ProviderDashboard() {
                     </div>
                   )}
                 </div>
+              )}
+
+              {/* ── RECOMMENDED JOBS TAB — Module 4 ── */}
+              {activeTab === 'recommended-jobs' && (
+                <RecommendedJobsFeed
+                  providerJobMatches={providerJobMatches}
+                  isLoading={isComputingMatches}
+                  expressedInterest={expressedInterest}
+                  onExpressInterest={expressInterest}
+                />
               )}
 
               {/* ── SETTINGS TAB ── */}

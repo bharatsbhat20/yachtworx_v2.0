@@ -963,4 +963,76 @@ export const SERVICE_CATEGORIES = [
   'Painting & Varnishing',
 ] as const;
 
+// ─── Module 4: Smart Matching Engine ─────────────────────────────────────────
+
+export type MatchScoreBand = 'best' | 'great' | 'good' | 'fair';
+
+export interface MatchFactorScores {
+  category: number;     // 0-100
+  proximity: number;    // 0-100
+  trust: number;        // 0-100
+  urgency: number;      // 0-100
+  boatType: number;     // 0-100
+  availability: number; // 0-100
+}
+
+export interface MatchResult {
+  providerId: string;
+  boatId: string;
+  needId: string;
+  needLabel: string;
+  matchScore: number;      // 0-100
+  band: MatchScoreBand;
+  factorScores: MatchFactorScores;
+  matchReasons: string[];  // 2-3 natural-language strings
+  matchSummary: string;    // e.g. "ABYC certified · 1.2 mi · 4.9★"
+  computedAt: string;
+}
+
+export interface BoatNeed {
+  id: string;
+  boatId: string;
+  boatName: string;
+  componentId?: string;
+  componentName: string;
+  category: string;          // raw BoatComponent.category
+  serviceCategory: string;   // canonical SERVICE_CATEGORIES value
+  urgencyLevel: 'critical' | 'high' | 'medium' | 'low' | 'proactive';
+  componentStatus: ComponentHealth['status'];
+  daysUntilDue?: number;
+  needLabel: string;         // e.g. "Main Engine — 442 days overdue"
+}
+
+export interface ProviderMatchSummary {
+  provider: ServiceProvider;
+  topMatch: MatchResult;
+  allMatches: MatchResult[];
+}
+
+export type JobOpportunityStatus = 'open' | 'in_review' | 'matched' | 'expired';
+
+export interface ProviderJobOpportunity {
+  id: string;
+  boatId: string;
+  boatName: string;
+  boatType: BoatType;
+  boatLength?: number;
+  homePort: string;
+  ownerId: string;
+  componentName: string;
+  serviceCategory: string;
+  urgencyLevel: BoatNeed['urgencyLevel'];
+  needLabel: string;
+  estimatedBudget?: number;
+  preferredDates?: string[];
+  status: JobOpportunityStatus;
+  postedAt: string;
+  expiresAt: string;
+}
+
+export interface ProviderJobMatch {
+  opportunity: ProviderJobOpportunity;
+  matchResult: MatchResult;
+}
+
 export type ServiceCategory = typeof SERVICE_CATEGORIES[number];

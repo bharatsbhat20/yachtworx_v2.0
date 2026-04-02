@@ -16,13 +16,14 @@ import {
   Ship, Settings, FileText, BarChart2, AlertTriangle,
   Clock, MapPin, Calendar, DollarSign, ArrowLeft, Wrench,
   Download, Upload, ChevronRight, Plus, Trash2,
-  Anchor, Info, CheckCircle
+  Anchor, Info, CheckCircle, Sparkles
 } from 'lucide-react';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   BarChart, Bar
 } from 'recharts';
 import { useBoatStore } from '../store/boatStore';
+import { useMatchStore } from '../store/matchStore';
 import { Tabs } from '../components/ui/Tabs';
 import { Badge } from '../components/ui/Badge';
 import { Card } from '../components/ui/Card';
@@ -31,6 +32,7 @@ import { ComponentManager } from '../components/boats/ComponentManager';
 import { MaintenanceUploadModal } from '../components/boats/MaintenanceUploadModal';
 import { valueHistoryData, maintenanceCostData } from '../data/mockData';
 import { calculateVesselHealth, getBand } from '../utils/healthScore';
+import { MatchedProviderPanel } from '../components/matching/MatchedProviderPanel';
 import type { MaintenanceDocument } from '../types';
 import { SERVICE_TYPE_LABELS, BOAT_TYPE_LABELS } from '../types';
 
@@ -42,6 +44,7 @@ const tabs = [
   { id: 'service',     label: 'Service History', icon: <Wrench size={14} /> },
   { id: 'documents',   label: 'Documents',      icon: <FileText size={14} /> },
   { id: 'analytics',   label: 'Analytics',      icon: <BarChart2 size={14} /> },
+  { id: 'matched',     label: 'Smart Matches',  icon: <Sparkles size={14} /> },
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -180,12 +183,20 @@ const SpecsSourceBadge: React.FC<{ source?: string }> = ({ source }) => {
 export const BoatProfile: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const { boats, selectBoat, selectedBoat, deleteDocument } = useBoatStore();
+  const { ownerNeeds, isComputing, computeMatchesForOwner } = useMatchStore();
   const [activeTab, setActiveTab] = useState('overview');
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
 
   useEffect(() => {
     if (id) selectBoat(id);
   }, [id, selectBoat]);
+
+  // Lazy-compute matches the first time the Smart Matches tab is opened
+  useEffect(() => {
+    if (activeTab === 'matched' && !isComputing && ownerNeeds.length === 0 && boats.length > 0) {
+      computeMatchesForOwner(boats);
+    }
+  }, [activeTab, boats.length]);
 
   const boat = selectedBoat || boats.find(b => b.id === id);
 
@@ -487,6 +498,95 @@ export const BoatProfile: React.FC = () => {
             )}
           </motion.div>
         )}
+
+        {/* ── Smart Matches Tab — Module 4 ── */}
+        {activeTab === 'matched' && boat && (() => {
+          const boatNeeds = ownerNeeds.filter(n => n.boatId === boat.id);
+          const critical  = boatNeeds.filter(n => n.urgencyLevel === 'critical' || n.urgencyLevel === 'high');
+          const dueSoon   = boatNeeds.filter(n => n.urgencyLevel === 'medium' || n.urgencyLevel === 'low');
+          const proactive = boatNeeds.filter(n => n.urgencyLevel === 'proactive');
+
+          return (
+            <motion.div initial={{ opacity: 1 }} animate={{ opacity: 1 }} className="space-y-8">
+              {/* Header */}
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-ocean-100 rounded-xl">
+                  <Sparkles size={20} className="text-ocean-600" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-heading font-bold text-navy-500">Smart Matches</h2>
+                  <p className="text-sm text-gray-400">AI-matched service providers for {boat.name}'s active needs</p>
+                </div>
+              </div>
+
+              {/* Loading skeleton */}
+              {isComputing && (
+                <div className="space-y-4">
+                  {[0, 1, 2].map(i => (
+                    <div key={i} className="rounded-2xl border border-gray-100 bg-gray-50 p-5 animate-pulse">
+                      <div className="h-4 bg-gray-200 rounded w-48 mb-3" />
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        {[0, 1, 2].map(j => (
+                          <div key={j} className="bg-white rounded-xl p-4 h-32" />
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* No needs state */}
+              {!isComputing && boatNeeds.length === 0 && (
+                <div className="text-center py-16 border-2 border-dashed border-gray-200 rounded-2xl">
+                  <Sparkles size={40} className="text-gray-300 mx-auto mb-3" />
+                  <p className="font-medium text-gray-700">No service needs detected</p>
+                  <p className="text-sm text-gray-400 mt-1">
+                    Add components to {boat.name} and mark them as overdue to see matched providers
+                  </p>
+                </div>
+              )}
+
+              {/* Critical & High urgency */}
+              {!isComputing && critical.length > 0 && (
+                <div className="space-y-4">
+                  <h3 className="text-sm font-semibold text-red-600 uppercase tracking-wide flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-red-500 inline-block" />
+                    Critical &amp; High Priority
+                  </h3>
+                  {critical.map(need => (
+                    <MatchedProviderPanel key={need.id} need={need} defaultOpen showViewAll />
+                  ))}
+                </div>
+              )}
+
+              {/* Due Soon */}
+              {!isComputing && dueSoon.length > 0 && (
+                <div className="space-y-4">
+                  <h3 className="text-sm font-semibold text-amber-600 uppercase tracking-wide flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-amber-500 inline-block" />
+                    Due Soon
+                  </h3>
+                  {dueSoon.map(need => (
+                    <MatchedProviderPanel key={need.id} need={need} defaultOpen={false} showViewAll />
+                  ))}
+                </div>
+              )}
+
+              {/* Proactive */}
+              {!isComputing && proactive.length > 0 && (
+                <div className="space-y-4">
+                  <h3 className="text-sm font-semibold text-ocean-600 uppercase tracking-wide flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-ocean-500 inline-block" />
+                    Proactive Maintenance
+                  </h3>
+                  {proactive.map(need => (
+                    <MatchedProviderPanel key={need.id} need={need} defaultOpen={false} showViewAll />
+                  ))}
+                </div>
+              )}
+            </motion.div>
+          );
+        })()}
 
         {/* ── Analytics Tab ── */}
         {activeTab === 'analytics' && (

@@ -8,20 +8,22 @@
  * - Health bar color uses TRD band colors (green/amber/red)
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Ship, Wrench, AlertTriangle, DollarSign, Plus, Calendar,
-  ArrowRight, Bell, CheckCircle, Clock, ChevronRight
+  ArrowRight, Bell, CheckCircle, Clock, ChevronRight, Sparkles
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { useBoatStore } from '../store/boatStore';
 import { useServiceStore } from '../store/serviceStore';
+import { useMatchStore } from '../store/matchStore';
 import { StatCard } from '../components/ui/StatCard';
 import { Badge } from '../components/ui/Badge';
 import { Card } from '../components/ui/Card';
 import { AddBoatWizard } from '../components/boats/AddBoatWizard';
+import { MatchedProviderPanel } from '../components/matching/MatchedProviderPanel';
 import { calculateVesselHealth } from '../utils/healthScore';
 import type { Boat } from '../types';
 
@@ -29,6 +31,7 @@ export const OwnerDashboard: React.FC = () => {
   const { currentUser } = useAuthStore();
   const { boats, getBoatsByOwner } = useBoatStore();
   const { requests } = useServiceStore();
+  const { ownerNeeds, isComputing, computeMatchesForOwner } = useMatchStore();
 
   const [addBoatOpen, setAddBoatOpen] = useState(false);
 
@@ -36,6 +39,20 @@ export const OwnerDashboard: React.FC = () => {
   const myBoats = currentUser
     ? getBoatsByOwner(currentUser.id)
     : boats.filter(b => !b.deletedAt);
+
+  // Compute smart matches once boats are loaded
+  useEffect(() => {
+    if (myBoats.length > 0) {
+      computeMatchesForOwner(myBoats);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [myBoats.length]);
+
+  // Pick the single highest-urgency need to feature in the Smart Suggestions panel
+  const topNeed = ownerNeeds.find(n => n.urgencyLevel === 'critical')
+    ?? ownerNeeds.find(n => n.urgencyLevel === 'high')
+    ?? ownerNeeds.find(n => n.urgencyLevel === 'medium')
+    ?? ownerNeeds[0];
 
   const activeRequests = requests.filter(r =>
     ['pending', 'matched', 'scheduled', 'in_progress'].includes(r.status)
@@ -160,6 +177,46 @@ export const OwnerDashboard: React.FC = () => {
             icon={<DollarSign size={20} />}
           />
         </motion.div>
+
+        {/* Smart Suggestions Panel */}
+        {(isComputing || topNeed) && (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.15 }}
+            className="mb-8"
+          >
+            <div className="flex items-center gap-2 mb-3">
+              <Sparkles size={16} className="text-ocean-500" />
+              <h2 className="text-lg font-heading font-semibold text-navy-500">Smart Suggestions</h2>
+              <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">AI-powered</span>
+            </div>
+            {isComputing && !topNeed ? (
+              <div className="bg-gray-50 rounded-2xl border border-gray-100 p-5 animate-pulse">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="h-5 bg-gray-200 rounded w-48" />
+                  <div className="h-5 bg-gray-200 rounded-full w-20" />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  {[0,1,2].map(i => (
+                    <div key={i} className="bg-white rounded-xl p-4 space-y-2">
+                      <div className="flex gap-3">
+                        <div className="w-10 h-10 rounded-full bg-gray-100" />
+                        <div className="flex-1 space-y-1.5">
+                          <div className="h-3 bg-gray-100 rounded w-24" />
+                          <div className="h-3 bg-gray-100 rounded w-16" />
+                        </div>
+                      </div>
+                      <div className="h-8 bg-gray-100 rounded-lg" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : topNeed ? (
+              <MatchedProviderPanel need={topNeed} defaultOpen showViewAll />
+            ) : null}
+          </motion.div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Fleet Overview */}

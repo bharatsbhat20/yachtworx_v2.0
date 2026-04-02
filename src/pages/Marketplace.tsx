@@ -10,10 +10,11 @@ import React, { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import {
   Search, SlidersHorizontal, MapPin, Clock, CheckCircle,
-  Star, Grid, List, X, CalendarPlus
+  Star, Grid, List, X, CalendarPlus, Sparkles
 } from 'lucide-react';
 import { useServiceStore } from '../store/serviceStore';
 import { useAuthStore } from '../store/authStore';
+import { useMatchStore } from '../store/matchStore';
 import { Input } from '../components/ui/Input';
 import { Badge } from '../components/ui/Badge';
 import { StarRating } from '../components/ui/StarRating';
@@ -21,6 +22,7 @@ import { Avatar } from '../components/ui/Avatar';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { BookingWizard } from '../components/booking/BookingWizard';
+import { MatchBadge } from '../components/matching/MatchBadge';
 import type { ServiceProvider } from '../types';
 
 const categories = [
@@ -30,14 +32,39 @@ const categories = [
 
 export const Marketplace: React.FC = () => {
   const { providers } = useServiceStore();
-  const { user } = useAuthStore();
+  const { currentUser } = useAuthStore();
+  const { matchResults } = useMatchStore();
+  const user = currentUser;
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  const [sortBy, setSortBy] = useState<'rating' | 'distance' | 'reviews'>('rating');
+  const [sortBy, setSortBy] = useState<'rating' | 'distance' | 'reviews' | 'match'>('rating');
   const [maxDistance, setMaxDistance] = useState(50);
   const [minRating, setMinRating] = useState(0);
   const [showFilters, setShowFilters] = useState(false);
+
+  // Build a score lookup: providerId → best match score across all needs
+  const matchScoreMap = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const r of matchResults) {
+      if (!map[r.providerId] || r.matchScore > map[r.providerId]) {
+        map[r.providerId] = r.matchScore;
+      }
+    }
+    return map;
+  }, [matchResults]);
+
+  const matchBandMap = useMemo(() => {
+    const map: Record<string, import('../types').MatchScoreBand> = {};
+    for (const r of matchResults) {
+      if (!map[r.providerId] || r.matchScore > (matchScoreMap[r.providerId] ?? 0)) {
+        map[r.providerId] = r.band;
+      }
+    }
+    return map;
+  }, [matchResults, matchScoreMap]);
+
+  const isMatchMode = sortBy === 'match' && Object.keys(matchScoreMap).length > 0;
 
   // Booking wizard state
   const [bookingProvider, setBookingProvider] = useState<ServiceProvider | null>(null);
@@ -71,6 +98,7 @@ export const Marketplace: React.FC = () => {
       if (sortBy === 'rating')   return b.rating - a.rating;
       if (sortBy === 'distance') return (a.distance || 99) - (b.distance || 99);
       if (sortBy === 'reviews')  return b.reviewCount - a.reviewCount;
+      if (sortBy === 'match')    return (matchScoreMap[b.id] ?? 0) - (matchScoreMap[a.id] ?? 0);
       return 0;
     });
   }, [providers, search, selectedCategory, maxDistance, minRating, sortBy]);
@@ -171,6 +199,9 @@ export const Marketplace: React.FC = () => {
                   onChange={e => setSortBy(e.target.value as typeof sortBy)}
                   className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ocean-500/30 focus:border-ocean-500"
                 >
+                  {Object.keys(matchScoreMap).length > 0 && (
+                    <option value="match">✨ Best Match (Smart)</option>
+                  )}
                   <option value="rating">Highest Rated</option>
                   <option value="distance">Nearest First</option>
                   <option value="reviews">Most Reviews</option>
@@ -206,10 +237,18 @@ export const Marketplace: React.FC = () => {
 
         {/* Results header */}
         <div className="flex items-center justify-between mb-6">
-          <p className="text-sm text-gray-500">
-            <span className="font-semibold text-navy-500">{filtered.length}</span> providers found
-            {selectedCategory !== 'All' && ` in ${selectedCategory}`}
-          </p>
+          <div className="flex items-center gap-3 flex-wrap">
+            <p className="text-sm text-gray-500">
+              <span className="font-semibold text-navy-500">{filtered.length}</span>
+              {isMatchMode ? ' providers matched to your fleet' : ' providers found'}
+              {selectedCategory !== 'All' && ` in ${selectedCategory}`}
+            </p>
+            {isMatchMode && (
+              <span className="flex items-center gap-1 text-xs bg-ocean-50 text-ocean-600 px-2 py-0.5 rounded-full font-medium border border-ocean-200">
+                <Sparkles size={11} /> Smart Match active
+              </span>
+            )}
+          </div>
           <div className="flex items-center gap-2">
             <button
               onClick={() => setViewMode('grid')}
@@ -250,11 +289,17 @@ export const Marketplace: React.FC = () => {
                   <div className="flex items-start justify-between mb-4">
                     <Avatar src={provider.avatar} alt={provider.name} size="lg" fallback={provider.name} />
                     <div className="flex flex-col gap-1 items-end">
-                      {provider.verified && (
+                      {isMatchMode && matchScoreMap[provider.id] ? (
+                        <MatchBadge
+                          score={matchScoreMap[provider.id]}
+                          band={matchBandMap[provider.id] ?? 'fair'}
+                          size="sm"
+                        />
+                      ) : provider.verified ? (
                         <div className="flex items-center gap-1 text-teal-600 text-xs font-medium">
                           <CheckCircle size={12} /> Verified
                         </div>
-                      )}
+                      ) : null}
                       <span className="text-xs text-gray-400 font-medium">{provider.yearsExperience}yr exp</span>
                     </div>
                   </div>
