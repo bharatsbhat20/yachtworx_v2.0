@@ -7,7 +7,7 @@ export interface ProfileRow {
   first_name: string;
   last_name: string;
   email: string;
-  role: 'owner' | 'provider' | 'admin';
+  role: 'owner' | 'provider' | 'admin' | 'marina';
   phone: string | null;
   avatar_url: string | null;
   stripe_account_id: string | null;
@@ -993,5 +993,304 @@ export function providerRowToServiceProvider(p: ProviderFullRow): ServiceProvide
     services:       [],
     verified:       p.verification_status === 'approved',
     featured:       p.is_featured ?? false,
+  };
+}
+
+// =============================================================================
+// MODULE 5 — Marina Partnerships & Enterprise Dashboard: Row types & mappers
+// =============================================================================
+
+import type {
+  Marina, MarinaBerth, MarinaBerthBooking,
+  MarinaStaff, MarinaProviderPartnership, MarinaReview,
+} from '../types';
+
+// ─── Row types ────────────────────────────────────────────────────────────────
+
+export interface MarinaRow {
+  id: string;
+  owner_id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  address: string;
+  city: string;
+  state: string;
+  country: string;
+  zip_code: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  phone: string | null;
+  email: string | null;
+  website: string | null;
+  vhf_channel: string | null;
+  total_berths: number;
+  available_berths: number;
+  max_vessel_length_ft: number;
+  max_draft_ft: number;
+  daily_rate_usd: number;
+  weekly_rate_usd: number | null;
+  monthly_rate_usd: number | null;
+  amenities: string[];
+  photos: string[];
+  cover_photo: string | null;
+  rating: number;
+  review_count: number;
+  stripe_account_id: string | null;
+  stripe_charges_enabled: boolean;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MarinaBerthRow {
+  id: string;
+  marina_id: string;
+  name: string;
+  berth_type: string;
+  length_ft: number;
+  width_ft: number;
+  max_draft_ft: number;
+  has_power: boolean;
+  power_amps: number | null;
+  has_water: boolean;
+  has_fuel: boolean;
+  daily_rate_usd: number;
+  weekly_rate_usd: number | null;
+  monthly_rate_usd: number | null;
+  status: string;
+  current_booking_id: string | null;
+  notes: string | null;
+}
+
+export interface MarinaBerthBookingRow {
+  id: string;
+  reference: string;
+  marina_id: string;
+  marina_name: string;
+  berth_id: string;
+  berth_name: string;
+  boat_id: string | null;
+  boat_name: string | null;
+  owner_id: string | null;
+  owner_name: string | null;
+  booking_source: string;
+  guest_name: string | null;
+  guest_email: string | null;
+  guest_phone: string | null;
+  check_in_date: string;
+  check_out_date: string;
+  nights: number;
+  rate_snapshot_usd: number;
+  total_amount_usd: number;
+  platform_fee_amount: number;
+  marina_payout_amount: number;
+  status: string;
+  special_requests: string | null;
+  payment_intent_id: string | null;
+  actual_check_in_at: string | null;
+  actual_check_out_at: string | null;
+  cancelled_at: string | null;
+  cancellation_reason: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MarinaStaffRow {
+  id: string;
+  marina_id: string;
+  user_id: string;
+  user_name: string | null;
+  user_email: string | null;
+  staff_role: string;
+  invited_by: string;
+  accepted_at: string | null;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface MarinaProviderPartnershipRow {
+  id: string;
+  marina_id: string;
+  marina_name: string | null;
+  provider_id: string;
+  provider_name: string | null;
+  provider_business_name: string | null;
+  tier: string;
+  status: string;
+  commission_rate: number;
+  service_categories: string[];
+  notes: string | null;
+  approved_at: string | null;
+  approved_by: string | null;
+  rejection_reason: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MarinaReviewRow {
+  id: string;
+  marina_id: string;
+  reviewer_id: string;
+  reviewer_name: string | null;
+  berth_booking_id: string;
+  overall_rating: number;
+  berth_quality_rating: number;
+  amenities_rating: number;
+  staff_rating: number;
+  value_rating: number;
+  comment: string | null;
+  owner_reply: string | null;
+  created_at: string;
+}
+
+// ─── Mappers ──────────────────────────────────────────────────────────────────
+
+export function rowToMarina(r: MarinaRow): Marina {
+  return {
+    id:                   r.id,
+    ownerId:              r.owner_id,
+    name:                 r.name,
+    slug:                 r.slug,
+    description:          r.description ?? '',
+    address:              r.address,
+    city:                 r.city,
+    state:                r.state,
+    country:              r.country,
+    zipCode:              r.zip_code ?? '',
+    latitude:             r.latitude ?? 0,
+    longitude:            r.longitude ?? 0,
+    phone:                r.phone ?? undefined,
+    email:                r.email ?? undefined,
+    website:              r.website ?? undefined,
+    vhfChannel:           r.vhf_channel ?? undefined,
+    totalBerths:          r.total_berths,
+    availableBerths:      r.available_berths,
+    maxVesselLengthFt:    r.max_vessel_length_ft,
+    maxDraftFt:           r.max_draft_ft,
+    dailyRateUsd:         r.daily_rate_usd,
+    weeklyRateUsd:        r.weekly_rate_usd ?? undefined,
+    monthlyRateUsd:       r.monthly_rate_usd ?? undefined,
+    amenities:            r.amenities,
+    photos:               r.photos,
+    coverPhoto:           r.cover_photo ?? '',
+    rating:               r.rating,
+    reviewCount:          r.review_count,
+    stripeAccountId:      r.stripe_account_id ?? undefined,
+    stripeChargesEnabled: r.stripe_charges_enabled,
+    isActive:             r.is_active,
+    createdAt:            r.created_at,
+    updatedAt:            r.updated_at,
+  };
+}
+
+export function rowToMarinaBerth(r: MarinaBerthRow): MarinaBerth {
+  return {
+    id:                r.id,
+    marinaId:          r.marina_id,
+    name:              r.name,
+    berthType:         r.berth_type as MarinaBerth['berthType'],
+    lengthFt:          r.length_ft,
+    widthFt:           r.width_ft,
+    maxDraftFt:        r.max_draft_ft,
+    hasPower:          r.has_power,
+    powerAmps:         r.power_amps ?? undefined,
+    hasWater:          r.has_water,
+    hasFuel:           r.has_fuel,
+    dailyRateUsd:      r.daily_rate_usd,
+    weeklyRateUsd:     r.weekly_rate_usd ?? undefined,
+    monthlyRateUsd:    r.monthly_rate_usd ?? undefined,
+    status:            r.status as MarinaBerth['status'],
+    currentBookingId:  r.current_booking_id ?? undefined,
+    notes:             r.notes ?? undefined,
+  };
+}
+
+export function rowToMarinaBerthBooking(r: MarinaBerthBookingRow): MarinaBerthBooking {
+  return {
+    id:                  r.id,
+    reference:           r.reference,
+    marinaId:            r.marina_id,
+    marinaName:          r.marina_name,
+    berthId:             r.berth_id,
+    berthName:           r.berth_name,
+    boatId:              r.boat_id ?? undefined,
+    boatName:            r.boat_name ?? undefined,
+    ownerId:             r.owner_id ?? undefined,
+    ownerName:           r.owner_name ?? undefined,
+    bookingSource:       r.booking_source as MarinaBerthBooking['bookingSource'],
+    guestName:           r.guest_name ?? undefined,
+    guestEmail:          r.guest_email ?? undefined,
+    guestPhone:          r.guest_phone ?? undefined,
+    checkInDate:         r.check_in_date,
+    checkOutDate:        r.check_out_date,
+    nights:              r.nights,
+    rateSnapshotUsd:     r.rate_snapshot_usd,
+    totalAmountUsd:      r.total_amount_usd,
+    platformFeeAmount:   r.platform_fee_amount,
+    marinaPayoutAmount:  r.marina_payout_amount,
+    status:              r.status as MarinaBerthBooking['status'],
+    specialRequests:     r.special_requests ?? undefined,
+    paymentIntentId:     r.payment_intent_id ?? undefined,
+    actualCheckInAt:     r.actual_check_in_at ?? undefined,
+    actualCheckOutAt:    r.actual_check_out_at ?? undefined,
+    cancelledAt:         r.cancelled_at ?? undefined,
+    cancellationReason:  r.cancellation_reason ?? undefined,
+    createdAt:           r.created_at,
+    updatedAt:           r.updated_at,
+  };
+}
+
+export function rowToMarinaStaff(r: MarinaStaffRow): MarinaStaff {
+  return {
+    id:         r.id,
+    marinaId:   r.marina_id,
+    userId:     r.user_id,
+    userName:   r.user_name ?? '',
+    userEmail:  r.user_email ?? '',
+    staffRole:  r.staff_role as MarinaStaff['staffRole'],
+    invitedBy:  r.invited_by,
+    acceptedAt: r.accepted_at ?? undefined,
+    isActive:   r.is_active,
+    createdAt:  r.created_at,
+  };
+}
+
+export function rowToMarinaPartnership(r: MarinaProviderPartnershipRow): MarinaProviderPartnership {
+  return {
+    id:                   r.id,
+    marinaId:             r.marina_id,
+    marinaName:           r.marina_name ?? '',
+    providerId:           r.provider_id,
+    providerName:         r.provider_name ?? '',
+    providerBusinessName: r.provider_business_name ?? '',
+    tier:                 r.tier as MarinaProviderPartnership['tier'],
+    status:               r.status as MarinaProviderPartnership['status'],
+    commissionRate:       r.commission_rate,
+    serviceCategories:    r.service_categories,
+    notes:                r.notes ?? undefined,
+    approvedAt:           r.approved_at ?? undefined,
+    approvedBy:           r.approved_by ?? undefined,
+    rejectionReason:      r.rejection_reason ?? undefined,
+    createdAt:            r.created_at,
+    updatedAt:            r.updated_at,
+  };
+}
+
+export function rowToMarinaReview(r: MarinaReviewRow): MarinaReview {
+  return {
+    id:                   r.id,
+    marinaId:             r.marina_id,
+    reviewerId:           r.reviewer_id,
+    reviewerName:         r.reviewer_name ?? 'Anonymous',
+    berthBookingId:       r.berth_booking_id,
+    overallRating:        r.overall_rating,
+    berthQualityRating:   r.berth_quality_rating,
+    amenitiesRating:      r.amenities_rating,
+    staffRating:          r.staff_rating,
+    valueRating:          r.value_rating,
+    comment:              r.comment ?? '',
+    ownerReply:           r.owner_reply ?? undefined,
+    createdAt:            r.created_at,
   };
 }

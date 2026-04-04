@@ -70,6 +70,21 @@ const defaultProvider: User = {
   updatedAt: '2024-01-01T00:00:00Z',
 };
 
+const defaultMarina: User = {
+  id: 'marina-owner-1',
+  firstName: 'David',
+  lastName: 'Park',
+  name: 'David Park',
+  email: 'marina@yachtworx.com',
+  role: 'marina',
+  emailVerified: true,
+  avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&h=200&fit=crop',
+  avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&h=200&fit=crop',
+  phone: '+1 305 555 0101',
+  createdAt: '2024-01-01T00:00:00Z',
+  updatedAt: '2024-01-01T00:00:00Z',
+};
+
 const defaultAdmin: User = {
   id: 'admin-1',
   firstName: 'Admin',
@@ -429,6 +444,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     const user =
       role === 'owner'    ? defaultOwner :
       role === 'provider' ? defaultProvider :
+      role === 'marina'   ? defaultMarina :
                             defaultAdmin;
     set({ currentUser: user });
   },

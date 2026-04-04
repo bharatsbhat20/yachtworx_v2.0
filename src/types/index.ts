@@ -1,6 +1,6 @@
 // ─── User & Auth ─────────────────────────────────────────────────────────────
 
-export type UserRole = 'owner' | 'provider' | 'admin';
+export type UserRole = 'owner' | 'provider' | 'admin' | 'marina';
 
 export interface User {
   id: string;
@@ -1036,3 +1036,208 @@ export interface ProviderJobMatch {
 }
 
 export type ServiceCategory = typeof SERVICE_CATEGORIES[number];
+
+// ─── Module 5: Marina Partnerships & Enterprise Dashboard ─────────────────────
+
+export type MarinaTier = 'standard' | 'preferred' | 'exclusive';
+export type MarinaStaffRole = 'owner' | 'manager' | 'harbormaster' | 'dock_attendant';
+export type BerthType = 'slip' | 'mooring' | 'anchorage' | 'dry_storage';
+export type BookingSource = 'online' | 'walk_up' | 'phone';
+export type PartnershipStatus = 'pending' | 'approved' | 'active' | 'rejected' | 'suspended' | 'terminated';
+
+export type BerthBookingStatus =
+  | 'PENDING'
+  | 'CONFIRMED'
+  | 'CHECKED_IN'
+  | 'CHECKED_OUT'
+  | 'CANCELLED'
+  | 'NO_SHOW';
+
+export interface MarinaAmenity {
+  id: string;
+  name: string;
+  icon: string; // lucide icon name
+  available: boolean;
+}
+
+export interface Marina {
+  id: string;
+  ownerId: string;
+  name: string;
+  slug: string;
+  description: string;
+  address: string;
+  city: string;
+  state: string;
+  country: string;
+  zipCode: string;
+  latitude: number;
+  longitude: number;
+  phone?: string;
+  email?: string;
+  website?: string;
+  vhfChannel?: string;
+  totalBerths: number;
+  availableBerths: number;
+  maxVesselLengthFt: number;
+  maxDraftFt: number;
+  dailyRateUsd: number;
+  weeklyRateUsd?: number;
+  monthlyRateUsd?: number;
+  amenities: string[];           // e.g. ['fuel', 'electricity', 'wifi', 'pump_out', 'showers']
+  photos: string[];              // URLs
+  coverPhoto: string;
+  rating: number;
+  reviewCount: number;
+  stripeAccountId?: string;
+  stripeChargesEnabled?: boolean;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MarinaBerth {
+  id: string;
+  marinaId: string;
+  name: string;                  // e.g. "A-12", "Slip 7"
+  berthType: BerthType;
+  lengthFt: number;
+  widthFt: number;
+  maxDraftFt: number;
+  hasPower: boolean;
+  powerAmps?: number;            // 30, 50, 100
+  hasWater: boolean;
+  hasFuel: boolean;
+  dailyRateUsd: number;
+  weeklyRateUsd?: number;
+  monthlyRateUsd?: number;
+  status: 'available' | 'occupied' | 'reserved' | 'maintenance';
+  currentBookingId?: string;
+  notes?: string;
+}
+
+export interface MarinaBerthBooking {
+  id: string;
+  reference: string;             // YW-MARINA-2026-001234
+  marinaId: string;
+  marinaName: string;
+  berthId: string;
+  berthName: string;
+  boatId?: string;               // nullable for walk-up
+  boatName?: string;
+  ownerId?: string;              // nullable for walk-up
+  ownerName?: string;
+  bookingSource: BookingSource;
+  guestName?: string;
+  guestEmail?: string;
+  guestPhone?: string;
+  checkInDate: string;
+  checkOutDate: string;
+  nights: number;
+  rateSnapshotUsd: number;
+  totalAmountUsd: number;
+  platformFeeAmount: number;
+  marinaPayoutAmount: number;
+  status: BerthBookingStatus;
+  specialRequests?: string;
+  paymentIntentId?: string;
+  actualCheckInAt?: string;
+  actualCheckOutAt?: string;
+  cancelledAt?: string;
+  cancellationReason?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MarinaStaff {
+  id: string;
+  marinaId: string;
+  userId: string;
+  userName: string;
+  userEmail: string;
+  staffRole: MarinaStaffRole;
+  invitedBy: string;
+  acceptedAt?: string;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface MarinaProviderPartnership {
+  id: string;
+  marinaId: string;
+  marinaName: string;
+  providerId: string;
+  providerName: string;
+  providerBusinessName: string;
+  tier: MarinaTier;
+  status: PartnershipStatus;
+  commissionRate: number;        // 0, 0.08, 0.12
+  serviceCategories: string[];
+  notes?: string;
+  approvedAt?: string;
+  approvedBy?: string;
+  rejectionReason?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MarinaReview {
+  id: string;
+  marinaId: string;
+  reviewerId: string;
+  reviewerName: string;
+  berthBookingId: string;
+  overallRating: number;
+  berthQualityRating: number;
+  amenitiesRating: number;
+  staffRating: number;
+  valueRating: number;
+  comment: string;
+  ownerReply?: string;
+  createdAt: string;
+}
+
+// ─── Enterprise Analytics ─────────────────────────────────────────────────────
+
+export interface OccupancyDataPoint {
+  date: string;
+  occupancyPct: number;
+  berthsOccupied: number;
+  totalBerths: number;
+}
+
+export interface RevenueDataPoint {
+  month: string;
+  berthRevenue: number;
+  serviceCommission: number;
+  total: number;
+}
+
+export interface FleetCompositionItem {
+  boatType: string;
+  count: number;
+  pct: number;
+}
+
+export interface ServiceDemandItem {
+  category: string;
+  requestCount: number;
+  pct: number;
+}
+
+export interface MarinaAnalytics {
+  marinaId: string;
+  currentOccupancyPct: number;
+  occupiedBerths: number;
+  totalBerths: number;
+  monthlyRevenue: number;
+  monthlyRevenueChange: number;  // % vs last month
+  ytdRevenue: number;
+  avgStayNights: number;
+  totalGuests: number;
+  occupancyTrend: OccupancyDataPoint[];
+  revenueTrend: RevenueDataPoint[];
+  fleetComposition: FleetCompositionItem[];
+  serviceDemand: ServiceDemandItem[];
+  topOriginPorts: { port: string; count: number }[];
+}

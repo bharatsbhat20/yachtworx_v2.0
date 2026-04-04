@@ -17,6 +17,7 @@ import {
   RefreshCw,
   Bell,
   Shield,
+  Building2,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useAuthStore } from '../../store/authStore';
@@ -29,6 +30,7 @@ const ownerNavLinks = [
   { to: '/boats/boat-1',    label: 'My Boats',   icon: Ship },
   { to: '/marketplace',     label: 'Marketplace',icon: ShoppingBag },
   { to: '/requests',        label: 'Services',   icon: ClipboardList },
+  { to: '/marinas',         label: 'Marinas',    icon: Anchor },
   { to: '/messages',        label: 'Messages',   icon: MessageSquare },
   { to: '/documents',       label: 'Documents',  icon: FileText },
 ];
@@ -37,6 +39,12 @@ const providerNavLinks = [
   { to: '/provider-dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/requests',           label: 'Jobs',       icon: ClipboardList },
   { to: '/messages',           label: 'Messages',   icon: MessageSquare },
+];
+
+const marinaNavLinks = [
+  { to: '/marina-dashboard', label: 'Dashboard',  icon: LayoutDashboard },
+  { to: '/marinas',          label: 'Marinas',    icon: Anchor },
+  { to: '/messages',         label: 'Messages',   icon: MessageSquare },
 ];
 
 const adminNavLinks = [
@@ -67,13 +75,17 @@ export const Navbar: React.FC = () => {
   const navLinks =
     currentUser?.role === 'provider' ? providerNavLinks :
     currentUser?.role === 'admin'    ? adminNavLinks :
+    currentUser?.role === 'marina'   ? marinaNavLinks :
     ownerNavLinks;
 
   const handleSwitchRole = () => {
-    const cycle: Record<string, UserRole> = { owner: 'provider', provider: 'admin', admin: 'owner' };
+    const cycle: Record<string, UserRole> = { owner: 'provider', provider: 'marina', marina: 'admin', admin: 'owner' };
     const newRole: UserRole = cycle[currentUser?.role ?? 'owner'] ?? 'owner';
     switchRole(newRole);
-    const dest = newRole === 'provider' ? '/provider-dashboard' : newRole === 'admin' ? '/admin' : '/dashboard';
+    const dest = newRole === 'provider' ? '/provider-dashboard'
+               : newRole === 'admin'    ? '/admin'
+               : newRole === 'marina'   ? '/marina-dashboard'
+               : '/dashboard';
     navigate(dest);
     setProfileOpen(false);
   };
@@ -184,7 +196,7 @@ export const Navbar: React.FC = () => {
                             className="flex items-center gap-2.5 px-4 py-2.5 w-full text-sm text-gray-600 hover:bg-gray-50 transition-colors"
                           >
                             <RefreshCw size={14} className="text-ocean-500" />
-                            Switch to {currentUser.role === 'owner' ? 'Provider' : currentUser.role === 'provider' ? 'Admin' : 'Owner'} Mode
+                            Switch to {currentUser.role === 'owner' ? 'Provider' : currentUser.role === 'provider' ? 'Marina' : currentUser.role === 'marina' ? 'Admin' : 'Owner'} Mode
                           </button>
                         )}
                         <button className="flex items-center gap-2.5 px-4 py-2.5 w-full text-sm text-gray-600 hover:bg-gray-50 transition-colors">
@@ -256,7 +268,7 @@ export const Navbar: React.FC = () => {
                         className="flex items-center gap-3 px-4 py-3 w-full rounded-xl text-sm font-medium text-white/70 hover:text-white hover:bg-white/10 transition-colors"
                       >
                         <RefreshCw size={18} />
-                        Switch to {currentUser.role === 'owner' ? 'Provider' : currentUser.role === 'provider' ? 'Admin' : 'Owner'} Mode
+                        Switch to {currentUser.role === 'owner' ? 'Provider' : currentUser.role === 'provider' ? 'Marina' : currentUser.role === 'marina' ? 'Admin' : 'Owner'} Mode
                       </button>
                     )}
                     <button
