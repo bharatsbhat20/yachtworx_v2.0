@@ -160,6 +160,21 @@ export interface Database {
         Insert: Omit<ReviewRow, 'created_at'>;
         Update: Partial<Omit<ReviewRow, 'id' | 'booking_id' | 'created_at'>>;
       };
+      job_opportunities: {
+        Row: JobOpportunityRow;
+        Insert: Omit<JobOpportunityRow, 'id' | 'created_at' | 'updated_at'>;
+        Update: Partial<Omit<JobOpportunityRow, 'id' | 'owner_id' | 'boat_id' | 'created_at' | 'updated_at'>>;
+      };
+      provider_job_interests: {
+        Row: ProviderJobInterestRow;
+        Insert: Omit<ProviderJobInterestRow, 'id' | 'created_at' | 'updated_at'>;
+        Update: Partial<Omit<ProviderJobInterestRow, 'id' | 'opportunity_id' | 'provider_id' | 'created_at' | 'updated_at'>>;
+      };
+      match_score_cache: {
+        Row: MatchScoreCacheRow;
+        Insert: Omit<MatchScoreCacheRow, 'id'>;
+        Update: Partial<Omit<MatchScoreCacheRow, 'id' | 'opportunity_id' | 'provider_id'>>;
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
@@ -820,5 +835,163 @@ export function rowToReviewExtended(r: ReviewExtendedRow): ReviewExtended {
     flagged: r.flagged,
     flaggedReason: r.flagged_reason ?? undefined,
     isVisible: r.is_visible,
+  };
+}
+
+// =============================================================================
+// MODULE 4 — Smart Matching Engine: Row types & mappers
+// =============================================================================
+
+import type { ProviderJobOpportunity, ServiceProvider } from '../types';
+
+// ─── ProviderFullRow ─────────────────────────────────────────────────────────
+// Represents a profiles row with ALL Module 3 provider columns included.
+// Used when fetching providers for the matching engine in live mode.
+
+export interface ProviderFullRow extends ProfileRow {
+  // Module 3 additions
+  business_name: string | null;
+  contact_name: string | null;
+  bio: string | null;
+  years_in_business: number | null;
+  emergency_availability: boolean | null;
+  profile_photo_url: string | null;
+  service_categories: string[] | null;
+  verification_status: string | null;
+  is_featured: boolean | null;
+  trust_score: number | null;
+  avg_rating: number | null;
+  review_count: number | null;
+  total_jobs_completed: number | null;
+  avg_response_hours: number | null;
+  address_city: string | null;
+  address_state: string | null;
+  latitude: number | null;
+  longitude: number | null;
+}
+
+// ─── JobOpportunityRow ────────────────────────────────────────────────────────
+
+export interface JobOpportunityRow {
+  id: string;
+  boat_id: string;
+  boat_name: string;
+  boat_type: string | null;
+  boat_length: number | null;
+  home_port: string | null;
+  owner_id: string;
+  component_id: string | null;
+  component_name: string;
+  service_category: string;
+  urgency_level: string;
+  need_label: string;
+  estimated_budget: number | null;
+  preferred_dates: string[] | null;
+  status: string;
+  posted_at: string;
+  expires_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// ─── ProviderJobInterestRow ───────────────────────────────────────────────────
+
+export interface ProviderJobInterestRow {
+  id: string;
+  opportunity_id: string;
+  provider_id: string;
+  match_score: number;
+  match_band: string;
+  status: string;
+  message: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// ─── MatchScoreCacheRow ───────────────────────────────────────────────────────
+
+export interface MatchScoreCacheRow {
+  id: string;
+  opportunity_id: string;
+  provider_id: string;
+  match_score: number;
+  match_band: string;
+  factor_scores: Record<string, number>;
+  match_reasons: string[];
+  match_summary: string;
+  computed_at: string;
+  expires_at: string;
+}
+
+// ─── Mappers ──────────────────────────────────────────────────────────────────
+
+export function rowToJobOpportunity(r: JobOpportunityRow): ProviderJobOpportunity {
+  return {
+    id: r.id,
+    boatId: r.boat_id,
+    boatName: r.boat_name,
+    boatType: (r.boat_type ?? 'motor_yacht') as ProviderJobOpportunity['boatType'],
+    boatLength: r.boat_length ?? undefined,
+    homePort: r.home_port ?? '',
+    ownerId: r.owner_id,
+    componentName: r.component_name,
+    serviceCategory: r.service_category,
+    urgencyLevel: r.urgency_level as ProviderJobOpportunity['urgencyLevel'],
+    needLabel: r.need_label,
+    estimatedBudget: r.estimated_budget ?? undefined,
+    preferredDates: r.preferred_dates ?? undefined,
+    status: r.status as ProviderJobOpportunity['status'],
+    postedAt: r.posted_at,
+    expiresAt: r.expires_at,
+  };
+}
+
+export function jobOpportunityToInsert(
+  opp: Omit<ProviderJobOpportunity, 'id' | 'status' | 'postedAt' | 'expiresAt'>
+): Omit<JobOpportunityRow, 'id' | 'created_at' | 'updated_at' | 'posted_at' | 'expires_at'> & {
+  status: string;
+} {
+  return {
+    boat_id:          opp.boatId,
+    boat_name:        opp.boatName,
+    boat_type:        opp.boatType ?? null,
+    boat_length:      opp.boatLength ?? null,
+    home_port:        opp.homePort ?? null,
+    owner_id:         opp.ownerId,
+    component_id:     null,
+    component_name:   opp.componentName,
+    service_category: opp.serviceCategory,
+    urgency_level:    opp.urgencyLevel,
+    need_label:       opp.needLabel,
+    estimated_budget: opp.estimatedBudget ?? null,
+    preferred_dates:  opp.preferredDates ?? null,
+    status:           'open',
+  };
+}
+
+/** Map a full provider profiles row → ServiceProvider shape used by the matching engine. */
+export function providerRowToServiceProvider(p: ProviderFullRow): ServiceProvider {
+  return {
+    id:             p.id,
+    name:           p.contact_name ?? p.business_name ?? 'Provider',
+    businessName:   p.business_name ?? '',
+    avatar:         p.profile_photo_url ?? undefined,
+    location:       [p.address_city, p.address_state].filter(Boolean).join(', ') || '',
+    // distance is approximated at 10 mi in live mode when no geo data available;
+    // a production implementation would compute Haversine distance from boat homePort coords.
+    distance:       10,
+    rating:         p.avg_rating ?? 4.0,
+    reviewCount:    p.review_count ?? 0,
+    categories:     p.service_categories ?? [],
+    certifications: [],
+    description:    p.bio ?? '',
+    yearsExperience: p.years_in_business ?? 0,
+    responseTime:   p.avg_response_hours
+                      ? `${Math.round(p.avg_response_hours)}h`
+                      : 'N/A',
+    completedJobs:  p.total_jobs_completed ?? 0,
+    services:       [],
+    verified:       p.verification_status === 'approved',
+    featured:       p.is_featured ?? false,
   };
 }
