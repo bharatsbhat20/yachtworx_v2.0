@@ -1101,6 +1101,8 @@ export interface MarinaBerthRow {
   status: string;
   current_booking_id: string | null;
   notes: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface MarinaBerthBookingRow {
@@ -1132,6 +1134,8 @@ export interface MarinaBerthBookingRow {
   actual_check_out_at: string | null;
   cancelled_at: string | null;
   cancellation_reason: string | null;
+  marina_transfer_id: string | null;
+  assigned_by: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -1143,7 +1147,7 @@ export interface MarinaStaffRow {
   user_name: string | null;
   user_email: string | null;
   staff_role: string;
-  invited_by: string;
+  invited_by: string | null;
   accepted_at: string | null;
   is_active: boolean;
   created_at: string;
@@ -1173,7 +1177,7 @@ export interface MarinaReviewRow {
   marina_id: string;
   reviewer_id: string;
   reviewer_name: string | null;
-  berth_booking_id: string;
+  berth_booking_id: string | null;
   overall_rating: number;
   berth_quality_rating: number;
   amenities_rating: number;
@@ -1289,7 +1293,7 @@ export function rowToMarinaStaff(r: MarinaStaffRow): MarinaStaff {
     userName:   r.user_name ?? '',
     userEmail:  r.user_email ?? '',
     staffRole:  r.staff_role as MarinaStaff['staffRole'],
-    invitedBy:  r.invited_by,
+    invitedBy:  r.invited_by ?? '',
     acceptedAt: r.accepted_at ?? undefined,
     isActive:   r.is_active,
     createdAt:  r.created_at,
@@ -1323,7 +1327,7 @@ export function rowToMarinaReview(r: MarinaReviewRow): MarinaReview {
     marinaId:             r.marina_id,
     reviewerId:           r.reviewer_id,
     reviewerName:         r.reviewer_name ?? 'Anonymous',
-    berthBookingId:       r.berth_booking_id,
+    berthBookingId:       r.berth_booking_id ?? '',
     overallRating:        r.overall_rating,
     berthQualityRating:   r.berth_quality_rating,
     amenitiesRating:      r.amenities_rating,
@@ -1399,6 +1403,8 @@ export function marinaBerthBookingToInsert(
     actual_check_out_at:  b.actualCheckOutAt ?? null,
     cancelled_at:         b.cancelledAt ?? null,
     cancellation_reason:  b.cancellationReason ?? null,
+    marina_transfer_id:   null,
+    assigned_by:          null,
   };
 }
 
@@ -1441,5 +1447,73 @@ export function marinaPartnershipToInsert(
     approved_at:           null,
     approved_by:           null,
     rejection_reason:      null,
+  };
+}
+
+/**
+ * Converts a camelCase MarinaBerth partial into the snake_case row
+ * shape expected by Supabase INSERT on marina_berths.
+ */
+export function marinaBerthToInsert(
+  b: Partial<MarinaBerth>
+): Omit<MarinaBerthRow, 'id' | 'created_at' | 'updated_at'> {
+  return {
+    marina_id:         b.marinaId ?? '',
+    name:              b.name ?? '',
+    berth_type:        b.berthType ?? 'slip',
+    length_ft:         b.lengthFt ?? 0,
+    width_ft:          b.widthFt ?? 0,
+    max_draft_ft:      b.maxDraftFt ?? 0,
+    has_power:         b.hasPower ?? false,
+    power_amps:        b.powerAmps ?? null,
+    has_water:         b.hasWater ?? false,
+    has_fuel:          b.hasFuel ?? false,
+    daily_rate_usd:    b.dailyRateUsd ?? 0,
+    weekly_rate_usd:   b.weeklyRateUsd ?? null,
+    monthly_rate_usd:  b.monthlyRateUsd ?? null,
+    status:            b.status ?? 'available',
+    current_booking_id: b.currentBookingId ?? null,
+    notes:             b.notes ?? null,
+  };
+}
+
+/**
+ * Converts a camelCase MarinaStaff partial into the snake_case row
+ * shape expected by Supabase INSERT on marina_staff.
+ */
+export function marinaStaffToInsert(
+  s: Partial<MarinaStaff>
+): Omit<MarinaStaffRow, 'id' | 'created_at'> {
+  return {
+    marina_id:   s.marinaId ?? '',
+    user_id:     s.userId ?? '',
+    user_name:   s.userName ?? null,
+    user_email:  s.userEmail ?? null,
+    staff_role:  s.staffRole ?? 'staff',
+    invited_by:  s.invitedBy ?? null,
+    accepted_at: s.acceptedAt ?? null,
+    is_active:   s.isActive ?? true,
+  };
+}
+
+/**
+ * Converts a camelCase MarinaReview partial into the snake_case row
+ * shape expected by Supabase INSERT on marina_reviews.
+ */
+export function marinaReviewToInsert(
+  r: Partial<MarinaReview>
+): Omit<MarinaReviewRow, 'id' | 'created_at'> {
+  return {
+    marina_id:              r.marinaId ?? '',
+    reviewer_id:            r.reviewerId ?? '',
+    reviewer_name:          r.reviewerName ?? null,
+    berth_booking_id:       r.berthBookingId ?? null,
+    overall_rating:         r.overallRating ?? 0,
+    berth_quality_rating:   r.berthQualityRating ?? 0,
+    amenities_rating:       r.amenitiesRating ?? 0,
+    staff_rating:           r.staffRating ?? 0,
+    value_rating:           r.valueRating ?? 0,
+    comment:                r.comment ?? null,
+    owner_reply:            r.ownerReply ?? null,
   };
 }

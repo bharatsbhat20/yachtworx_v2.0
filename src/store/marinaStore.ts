@@ -114,11 +114,36 @@ interface MarinaStoreState {
 
 const MONTH_LABELS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
+/**
+ * Minimal berth row shape needed for analytics (only status is used).
+ * Using a pick rather than the full MarinaBerthRow avoids a type error
+ * when Supabase returns only selected columns.
+ */
+interface AnalyticsBerthRow {
+  status: string;
+}
+
+/**
+ * Minimal booking row shape needed for analytics.
+ * Matches the columns selected in loadAnalytics:
+ *   check_in_date, nights, total_amount_usd, platform_fee_amount,
+ *   status, owner_id, guest_email
+ */
+interface AnalyticsBookingRow {
+  check_in_date: string;
+  nights: number;
+  total_amount_usd: number;
+  platform_fee_amount: number;
+  status: string;
+  owner_id: string | null;
+  guest_email: string | null;
+}
+
 function buildAnalyticsFromLiveData(
   marinaId: string,
   marina: Marina,
-  bookingRows: MarinaBerthBookingRow[],
-  berthRows: MarinaBerthRow[],
+  bookingRows: AnalyticsBookingRow[],
+  berthRows: AnalyticsBerthRow[],
 ): MarinaAnalytics {
   const now = new Date();
 
@@ -755,8 +780,8 @@ export const useMarinaStore = create<MarinaStoreState>((set, get) => ({
         const analyticsData = buildAnalyticsFromLiveData(
           marinaId,
           marina,
-          (bookingsResult.data ?? []) as MarinaBerthBookingRow[],
-          (berthsResult.data ?? []) as MarinaBerthRow[],
+          (bookingsResult.data ?? []) as AnalyticsBookingRow[],
+          (berthsResult.data ?? []) as AnalyticsBerthRow[],
         );
 
         set(state => ({
