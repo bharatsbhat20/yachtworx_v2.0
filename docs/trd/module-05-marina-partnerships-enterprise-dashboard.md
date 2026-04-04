@@ -1,8 +1,8 @@
 # Yachtworx – Technical Requirements Document
 ## Module 5: Marina Partnerships & Enterprise Dashboard
-**Version:** 1.0
+**Version:** 1.1
 **Date:** 2026-04-03
-**Status:** Approved for Implementation
+**Status:** Ready for Implementation
 
 ---
 
@@ -548,13 +548,29 @@ Platform fee is non-refundable except on marina-initiated cancellations.
 |---|---|---|---|---|
 | `standard` | ☑ On-site Provider | Proximity → 100 | 0% | Non-exclusive |
 | `preferred` | ⭐ Preferred Partner | Proximity → 100 + +5 overall | 8% of job value | Non-exclusive |
-| `exclusive` | 🏆 Exclusive Partner | Proximity → 100 + +10 overall | 12% of job value | Exclusive per category |
+| `exclusive` | 🏆 Exclusive Partner | Proximity → 100 + +10 overall | 12% of job value | Exclusive per service category |
 
 **Commission flow (preferred/exclusive):**
 - Yacht owner pays provider full job rate via Module 2 booking
 - Platform takes its standard 10% fee
 - Marina receives commission % of the net provider payout
-- Implemented via Stripe Connect transfer splits
+- Implemented via Stripe Connect transfer splits (see §14.2)
+
+**Exclusive tier conflict check:**
+When a provider applies for `exclusive` tier at a marina, the system must verify no active `exclusive` partnership already exists for the same marina AND overlapping `service_categories`. Conflict check logic:
+
+```sql
+-- Conflict check: block if another provider already holds exclusive
+-- for an overlapping category at this marina
+select count(*) from marina_provider_partnerships
+where marina_id = :marina_id
+  and tier = 'exclusive'
+  and status = 'active'
+  and provider_id != :applicant_provider_id
+  and service_categories && :applicant_categories;  -- PostgreSQL array overlap operator
+```
+
+If count > 0, the application is auto-rejected with reason `"exclusive_conflict"` and the marina owner is notified of the conflicting provider. Multiple non-overlapping exclusive providers are permitted at the same marina (e.g., one exclusive engine mechanic AND one exclusive detailer).
 
 ### 7.2 Partnership Application State Machine
 
@@ -795,8 +811,12 @@ Available only when a marina owner has ≥ 2 marinas.
 | reference | text UNIQUE | "YW-MARINA-{year}-{seq}" |
 | marina_id | uuid FK → marinas | |
 | berth_id | uuid FK → marina_berths | |
-| boat_id | uuid FK → boats | |
-| owner_id | uuid FK → profiles | |
+| boat_id | uuid FK → boats | **Nullable** — null for walk-up/phone bookings |
+| owner_id | uuid FK → profiles | **Nullable** — null for walk-up/phone bookings |
+| booking_source | varchar(20) | `'online'` `'walk_up'` `'phone'` — default `'online'` |
+| guest_name | text | Walk-up guest display name (null for registered owners) |
+| guest_email | text | Walk-up guest contact email |
+| guest_phone | text | Walk-up guest contact phone |
 | check_in_date | date | |
 | check_out_date | date | |
 | nights | int | Computed: check_out – check_in |
@@ -1050,7 +1070,7 @@ Reuse existing Recharts components (already in bundle from Modules 1–4):
 - `LineChart` — occupancy trend, revenue trend
 - `BarChart` — revenue by source, occupancy by berth type, monthly comparison
 - `PieChart` / `RadialBarChart` — current occupancy donut, service demand donut
-- New: Map-based heatmap for vessel origins → use Leaflet.js (new dependency, lazy-loaded)
+- New: Map-based heatmap for vessel origins → **Mapbox GL JS** (lazy-loaded, same SDK used for marina discovery map and geocoding; env var: `VITE_MAPBOX_TOKEN`)
 
 ---
 
@@ -1064,18 +1084,42 @@ Reuse existing Recharts components (already in bundle from Modules 1–4):
 | `marina_provider_partnerships:{marina_id}` | INSERT, UPDATE | Marina owner notifications |
 | `job_opportunities:{marina_id}` | INSERT | Provider marina job board |
 
-### 14.2 Stripe Connect (Berth Bookings)
+### 14.2 Stripe Connect (Berth Bookings & Service Commissions)
 
-Mirrors the Module 2 booking payment flow:
-- `payment_intent.create` with `transfer_data.destination = marina.stripe_account_id`
-- Platform fee via `application_fee_amount`
-- For preferred/exclusive providers: three-way split — platform fee + marina commission + provider payout (two separate transfers)
+**Berth booking payment (transient/seasonal):**
+- `PaymentIntent.create` with `transfer_data.destination = marina.stripe_account_id`
+- Platform fee deducted via `application_fee_amount` (8% platform rate for marina bookings)
+- Remaining net amount auto-transferred to marina's connected Stripe account on capture
+
+**Service commission (preferred/exclusive providers):**
+No custom Stripe arrangement required. Two sequential transfers handle the three-way split:
+
+1. **Primary PaymentIntent** — Yacht owner → Provider (standard Module 2 flow):
+   - `application_fee_amount` = platform 10% fee (stays on platform account)
+   - `transfer_data.destination` = provider's Stripe Connect account
+
+2. **Secondary Transfer** — Platform → Marina (triggered by webhook):
+   - Trigger: `payment_intent.succeeded` webhook event
+   - Source: platform's own Stripe balance (funded from the 10% application fee already collected)
+   - `Transfer.create({ amount: marina_commission_amount, currency: 'usd', destination: marina.stripe_account_id })`
+   - `marina_commission_amount` = job value × tier commission rate (8% preferred, 12% exclusive)
+   - Webhook handler stores transfer ID in `service_bookings.marina_transfer_id` for reconciliation
+
+This approach requires no custom Stripe arrangement and works within standard Connect semantics.
 
 ### 14.3 Geocoding (Marina Location)
 
-- On marina address save, call a geocoding API (e.g. Google Maps Geocoding API or Mapbox)
-- Store `latitude` and `longitude` in `marinas` table
-- Used for map rendering and distance calculations in matching
+**SDK: Mapbox Geocoding API** (Mapbox GL JS — same dependency as marina discovery map and vessel origins heatmap; single SDK, single token)
+
+- **Env var:** `VITE_MAPBOX_TOKEN` (added to `.env.local` and Vercel project env)
+- On marina address save (Step 2 of onboarding wizard), call:
+  `GET https://api.mapbox.com/geocoding/v5/mapbox.places/{address}.json?access_token={token}`
+- Parse first feature's `[lng, lat]` coordinates
+- Store `latitude` and `longitude` in `marinas` table (also populate the PostGIS `location` column via trigger)
+- Used for:
+  - Marina discovery map marker placement (§5)
+  - Distance calculations in matching enrichment (`applyMarinaContext()`)
+  - Vessel origins heatmap coordinate clustering (§13.4)
 
 ### 14.4 Module 4 Matching Engine Hook
 
@@ -1203,7 +1247,7 @@ Geospatial index enables `ORDER BY location <-> ST_Point(lng, lat)::geography` f
 - [ ] Pre-computed analytics materialized views + refresh job
 
 ### Phase 6 — Polish & Integration (Week 9)
-- [ ] Marina map with Leaflet.js (vessel origins heatmap)
+- [ ] Mapbox GL JS integration (marina discovery map + vessel origins heatmap on Enterprise Dashboard)
 - [ ] All notification triggers wired up
 - [ ] Demo data for all marina features
 - [ ] Full RLS audit
@@ -1213,16 +1257,18 @@ Geospatial index enables `ORDER BY location <-> ST_Point(lng, lat)::geography` f
 
 ## 18. Open Questions
 
-| # | Question | Owner | Target Resolution |
+All questions resolved as of v1.1 (2026-04-03). Decisions reflected in TRD body.
+
+| # | Question | Status | Decision |
 |---|---|---|---|
-| 1 | Should marina berth bookings use the same Module 2 `bookings` table (with a `booking_type` column) or a separate `marina_berth_bookings` table? Separate table preferred for isolation but adds schema complexity. | Engineering | Phase 1 start |
-| 2 | What geocoding API should be used for marina address → lat/lng? (Google Maps, Mapbox, or OpenStreetMap Nominatim for cost reasons?) | Product | Phase 1 start |
-| 3 | Should the platform fee for marinas (8%) be the same as for service bookings (10%)? Is there a preferred marina rate? | Commercial | Phase 2 start |
-| 4 | Should marina operators be able to create a berth booking on behalf of a vessel (walk-up, phone reservation) without the owner having a Yachtworx account? | Product | Phase 2 start |
-| 5 | For the exclusive tier, should exclusivity be per category (e.g., one exclusive engine mechanic) or per marina (one exclusive provider overall)? Current TRD says per category. | Product | Phase 4 start |
-| 6 | Does the three-way Stripe split (platform + marina + provider) require a custom Stripe arrangement or can it be handled with two sequential transfers? | Engineering | Phase 4 start |
-| 7 | Should marina reviews be pooled with the general ratings system or kept separate per `marina_reviews` table? Currently specified as separate. | Product | Phase 2 start |
-| 8 | Vessel origins heatmap on Enterprise Dashboard — is Leaflet.js acceptable, or should we use Mapbox GL JS for better performance at scale? | Engineering | Phase 5 start |
+| 1 | Should marina berth bookings use the same Module 2 `bookings` table or a separate `marina_berth_bookings` table? | ✅ Resolved | **Separate table** (`marina_berth_bookings`). Cleaner isolation for marina-specific columns (berth assignment, VHF, operator tracking) without polluting the service bookings schema. |
+| 2 | What geocoding API for marina address → lat/lng? | ✅ Resolved | **Mapbox Geocoding API** (`VITE_MAPBOX_TOKEN`). Same SDK as discovery map and heatmap; single dependency, single billing account. See §14.3. |
+| 3 | Should the platform fee for marina berth bookings be 8% (vs 10% for services)? | ✅ Resolved | **8% platform fee** for berth bookings. Marinas operate on thinner margins; reduced rate incentivises adoption. Service commission splits (preferred/exclusive) are separate from platform fee. |
+| 4 | Should operators be able to create bookings for walk-up vessels without a Yachtworx account? | ✅ Resolved | **Yes — walk-up bookings supported.** `boat_id` and `owner_id` are nullable; `booking_source`, `guest_name`, `guest_email`, `guest_phone` columns added. If guest later creates an account with the same email, bookings are retroactively linked. See §10.3. |
+| 5 | Should exclusive tier exclusivity be per service category or per marina? | ✅ Resolved | **Per service category.** Multiple non-overlapping exclusive providers permitted at the same marina (e.g., exclusive engine mechanic + exclusive detailer). Conflict check blocks overlapping category exclusives. See §7.1. |
+| 6 | Does the three-way Stripe split require a custom arrangement or two sequential transfers? | ✅ Resolved | **Two sequential transfers — no custom Stripe arrangement needed.** Primary PaymentIntent goes owner → provider; secondary Transfer goes platform → marina (funded from application fee), triggered by `payment_intent.succeeded` webhook. See §14.2. |
+| 7 | Should marina reviews be pooled with the general ratings system or kept in a separate `marina_reviews` table? | ✅ Resolved | **Separate `marina_reviews` table.** Marina reviews have different fields (berth quality, amenities, staff, value) and aggregate differently than service provider ratings. General ratings stay clean. |
+| 8 | Vessel origins heatmap — Leaflet.js or Mapbox GL JS? | ✅ Resolved | **Mapbox GL JS.** Consistent with geocoding choice (single SDK, single token). Better WebGL performance at scale and first-class cluster/heatmap layer support. See §13.4 and Phase 6. |
 
 ---
 
