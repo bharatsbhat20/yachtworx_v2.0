@@ -17,6 +17,10 @@ import { AuthPage } from './pages/AuthPage';
 import { MarinaDiscovery } from './pages/MarinaDiscovery';
 import { MarinaProfile } from './pages/MarinaProfile';
 import MarinaDashboard from './pages/MarinaDashboard';
+import { InsuranceWallet } from './pages/InsuranceWallet';
+import { InsuranceMarketplace } from './pages/InsuranceMarketplace';
+import { InsurerDashboard } from './pages/InsurerDashboard';
+import { AgentDashboard } from './pages/AgentDashboard';
 import { useAuthStore } from './store/authStore';
 
 const noNavbarRoutes = ['/auth', '/register-provider', '/admin'];
@@ -74,6 +78,14 @@ const AppContent: React.FC = () => {
 
           {/* Protected — admin */}
           <Route path="/admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
+
+          {/* Protected — insurance (owner wallet + marketplace) */}
+          <Route path="/insurance" element={<ProtectedRoute><InsuranceWallet /></ProtectedRoute>} />
+          <Route path="/insurance/marketplace" element={<ProtectedRoute><InsuranceMarketplace /></ProtectedRoute>} />
+
+          {/* Protected — insurer & agent */}
+          <Route path="/insurer-dashboard" element={<ProtectedRoute><InsurerDashboard /></ProtectedRoute>} />
+          <Route path="/agent-dashboard"   element={<ProtectedRoute><AgentDashboard /></ProtectedRoute>} />
         </Routes>
       </AnimatePresence>
     </>

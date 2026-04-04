@@ -1,6 +1,6 @@
 // ─── User & Auth ─────────────────────────────────────────────────────────────
 
-export type UserRole = 'owner' | 'provider' | 'admin' | 'marina';
+export type UserRole = 'owner' | 'provider' | 'admin' | 'marina' | 'insurer' | 'agent';
 
 export interface User {
   id: string;
@@ -1240,4 +1240,340 @@ export interface MarinaAnalytics {
   fleetComposition: FleetCompositionItem[];
   serviceDemand: ServiceDemandItem[];
   topOriginPorts: { port: string; count: number }[];
+}
+
+// =============================================================================
+// Module 6 — Insurance & Warranty Layer
+// =============================================================================
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+export type KybStatus = 'pending' | 'approved' | 'rejected' | 'suspended';
+export type LicenceStatus = 'pending' | 'active' | 'expired' | 'suspended';
+export type ProductType = 'hull_and_machinery' | 'protection_and_indemnity' | 'crew_personal_accident' | 'charter_liability' | 'extended_warranty';
+export type ProductStatus = 'draft' | 'active' | 'paused' | 'archived';
+export type QuoteStatus = 'draft' | 'pending_review' | 'quoted' | 'declined' | 'bound' | 'expired';
+export type PolicyStatus = 'pending_bind' | 'active' | 'expiring' | 'expired' | 'lapsed' | 'cancelled';
+export type ClaimStatus = 'draft' | 'submitted' | 'under_review' | 'pending_assessment' | 'assessment_complete' | 'pending_approval' | 'approved' | 'payment_processing' | 'paid' | 'rejected' | 'appealed' | 'closed';
+export type CoverageDecision = 'fully_covered' | 'partially_covered' | 'not_covered';
+export type WarrantyType = 'labour_only' | 'parts_only' | 'combined';
+export type WarrantyStatus = 'active' | 'expired' | 'voided';
+export type WarrantyClaimStatus = 'submitted' | 'acknowledged' | 'in_progress' | 'resolved' | 'disputed' | 'escalated' | 'closed';
+export type CommissionStatus = 'pending' | 'earned' | 'paid' | 'clawed_back';
+export type CommissionTier = 'standard' | 'preferred' | 'elite';
+export type InstalmentOption = 'annual' | 'semi_annual' | 'monthly';
+export type UseType = 'pleasure' | 'charter' | 'racing' | 'commercial';
+export type Territory = 'us_east' | 'us_west' | 'gulf' | 'caribbean' | 'mediterranean' | 'worldwide';
+export type MooringType = 'marina_slip' | 'mooring_ball' | 'at_anchor' | 'dry_storage';
+export type IncidentType = 'collision' | 'weather' | 'theft' | 'fire' | 'sinking' | 'machinery' | 'other';
+export type EndorsementType = 'vessel_name_change' | 'territory_extension' | 'agreed_value_change' | 'use_type_change' | 'other';
+export type AgentAssocStatus = 'invited' | 'active' | 'suspended' | 'terminated';
+
+// ─── Insurer ──────────────────────────────────────────────────────────────────
+
+export interface Insurer {
+  id: string;
+  ownerUserId: string;
+  legalName: string;
+  tradingName?: string;
+  companyNumber?: string;
+  country: string;
+  amBestRating?: string;
+  primaryContactName?: string;
+  primaryContactEmail?: string;
+  phone?: string;
+  website?: string;
+  kybStatus: KybStatus;
+  kybReviewedAt?: string;
+  kybReviewedBy?: string;
+  stripeAccountId?: string;
+  stripeChargesEnabled: boolean;
+  stripePayoutsEnabled: boolean;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ─── Insurance Agent ──────────────────────────────────────────────────────────
+
+export interface InsuranceAgent {
+  id: string;
+  userId: string;
+  userName: string;
+  userEmail: string;
+  licenceNumber: string;
+  licenceState?: string;
+  licenceExpiry?: string;
+  licenceStatus: LicenceStatus;
+  eoExpiry?: string;
+  stripeAccountId?: string;
+  stripePayoutsEnabled: boolean;
+  isActive: boolean;
+  // Denormalised for display
+  associatedInsurers?: { insurerId: string; insurerName: string; tier: CommissionTier; commissionRate: number; status: AgentAssocStatus }[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ─── Insurance Product ────────────────────────────────────────────────────────
+
+export interface InsuranceProduct {
+  id: string;
+  insurerId: string;
+  insurerName: string;
+  insurerLogo?: string;
+  productType: ProductType;
+  name: string;
+  description?: string;
+  coverageSummary: string[];
+  exclusionsSummary: string[];
+  minVesselLoaFt?: number;
+  maxVesselLoaFt?: number;
+  maxVesselAgeYears?: number;
+  allowedUseTypes: UseType[];
+  allowedTerritories: Territory[];
+  baseRatePct?: number;
+  baseRatePerFoot?: number;
+  minPremiumUsd: number;
+  deductiblePct?: number;
+  deductibleFixedUsd?: number;
+  instalmentOptions: InstalmentOption[];
+  instantBind: boolean;
+  cancellationPolicy?: string;
+  status: ProductStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ─── Insurance Quote ──────────────────────────────────────────────────────────
+
+export interface InsuranceQuote {
+  id: string;
+  reference: string;
+  ownerId: string;
+  ownerName?: string;
+  agentId?: string;
+  agentName?: string;
+  productId: string;
+  productName: string;
+  insurerId: string;
+  insurerName: string;
+  boatId: string;
+  boatName?: string;
+  agreedValueUsd: number;
+  useType: UseType;
+  territory: Territory;
+  mooringType: MooringType;
+  priorClaimsCount: number;
+  annualPremiumUsd: number;
+  instalmentOption: InstalmentOption;
+  instalmentAmountUsd: number;
+  deductibleUsd: number;
+  status: QuoteStatus;
+  expiresAt: string;
+  quotePdfUrl?: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ─── Insurance Policy ─────────────────────────────────────────────────────────
+
+export interface InsurancePolicy {
+  id: string;
+  policyNumber: string;
+  quoteId?: string;
+  ownerId: string;
+  ownerName?: string;
+  agentId?: string;
+  agentName?: string;
+  insurerId: string;
+  insurerName: string;
+  productId: string;
+  productName: string;
+  productType: ProductType;
+  boatId: string;
+  boatName?: string;
+  agreedValueUsd: number;
+  annualPremiumUsd: number;
+  instalmentOption: InstalmentOption;
+  instalmentAmountUsd: number;
+  deductibleUsd: number;
+  effectiveDate: string;
+  expiryDate: string;
+  territory: Territory;
+  useType: UseType;
+  mooringType: MooringType;
+  status: PolicyStatus;
+  stripeSubscriptionId?: string;
+  stripePaymentIntentId?: string;
+  autoRenew: boolean;
+  cancellationDate?: string;
+  cancellationReason?: string;
+  coiUrl?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ─── Policy Endorsement ───────────────────────────────────────────────────────
+
+export interface PolicyEndorsement {
+  id: string;
+  policyId: string;
+  endorsementType: EndorsementType;
+  description: string;
+  effectiveDate: string;
+  premiumAdjustmentUsd: number;
+  requestedBy: string;
+  approvedBy?: string;
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: string;
+}
+
+// ─── Insurance Claim ──────────────────────────────────────────────────────────
+
+export interface InsuranceClaim {
+  id: string;
+  reference: string;
+  policyId: string;
+  policyNumber?: string;
+  ownerId: string;
+  ownerName?: string;
+  insurerId: string;
+  insurerName?: string;
+  adjusterId?: string;
+  adjusterName?: string;
+  incidentDate: string;
+  incidentTime?: string;
+  incidentLatitude?: number;
+  incidentLongitude?: number;
+  incidentLocationName?: string;
+  incidentType: IncidentType;
+  description: string;
+  estimatedLossUsd: number;
+  status: ClaimStatus;
+  approvedAmountUsd?: number;
+  platformFeeUsd?: number;
+  providerPayoutUsd?: number;
+  repairProviderId?: string;
+  repairProviderName?: string;
+  repairBookingId?: string;
+  stripeTransferId?: string;
+  fraudFlag: boolean;
+  appealReason?: string;
+  closedAt?: string;
+  documents?: ClaimDocument[];
+  assessment?: ClaimAssessment;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ClaimDocument {
+  id: string;
+  claimId: string;
+  uploadedBy: string;
+  documentType: 'photo' | 'estimate' | 'invoice' | 'police_report' | 'survey_report' | 'other';
+  storageUrl: string;
+  description?: string;
+  requestedByAdjuster: boolean;
+  createdAt: string;
+}
+
+export interface ClaimAssessment {
+  id: string;
+  claimId: string;
+  adjusterId: string;
+  adjusterName?: string;
+  coverageDecision: CoverageDecision;
+  decisionReason?: string;
+  approvedAmountUsd: number;
+  recommendedProviderId?: string;
+  assessmentNotes?: string;
+  submittedAt?: string;
+  reviewedBy?: string;
+  reviewedAt?: string;
+}
+
+// ─── Warranty Registration ────────────────────────────────────────────────────
+
+export interface WarrantyRegistration {
+  id: string;
+  reference: string;
+  bookingId: string;
+  providerId: string;
+  providerName?: string;
+  ownerId: string;
+  ownerName?: string;
+  boatId: string;
+  boatName?: string;
+  warrantyType: WarrantyType;
+  durationDays: number;
+  effectiveDate: string;
+  expiryDate: string;
+  description?: string;
+  certificateUrl?: string;
+  status: WarrantyStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ─── Warranty Claim ───────────────────────────────────────────────────────────
+
+export interface WarrantyClaim {
+  id: string;
+  reference: string;
+  warrantyId: string;
+  warrantyReference?: string;
+  ownerId: string;
+  ownerName?: string;
+  providerId: string;
+  providerName?: string;
+  boatName?: string;
+  description: string;
+  status: WarrantyClaimStatus;
+  providerResponse?: string;
+  resolutionDescription?: string;
+  escalatedAt?: string;
+  escalatedReason?: string;
+  resolvedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ─── Agent Commission ─────────────────────────────────────────────────────────
+
+export interface AgentCommission {
+  id: string;
+  agentId: string;
+  policyId: string;
+  policyNumber?: string;
+  ownerName?: string;
+  commissionType: 'new_business' | 'renewal';
+  grossPremiumUsd: number;
+  commissionRate: number;
+  commissionAmountUsd: number;
+  status: CommissionStatus;
+  earnedAt?: string;
+  paidAt?: string;
+  stripeTransferId?: string;
+  createdAt: string;
+}
+
+// ─── Insurer Analytics ────────────────────────────────────────────────────────
+
+export interface InsurerAnalytics {
+  insurerId: string;
+  activePolicies: number;
+  totalInsuredValueUsd: number;
+  monthlyPremiumUsd: number;
+  renewalRate: number;
+  openClaims: number;
+  avgTimeToClosedays: number;
+  lossRatioPct: number;
+  premiumTrend: { month: string; premium: number; claims: number }[];
+  claimsByType: { type: string; count: number; pct: number }[];
+  topProducts: { name: string; policies: number; premium: number }[];
+  expiringPolicies30d: number;
+  expiringPolicies60d: number;
+  expiringPolicies90d: number;
 }

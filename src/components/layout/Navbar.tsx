@@ -18,6 +18,8 @@ import {
   Bell,
   Shield,
   Building2,
+  Users,
+  Umbrella,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useAuthStore } from '../../store/authStore';
@@ -26,13 +28,14 @@ import { Avatar } from '../ui/Avatar';
 import { isDemoMode } from '../../lib/supabase';
 
 const ownerNavLinks = [
-  { to: '/dashboard',       label: 'Dashboard',  icon: LayoutDashboard },
-  { to: '/boats/boat-1',    label: 'My Boats',   icon: Ship },
-  { to: '/marketplace',     label: 'Marketplace',icon: ShoppingBag },
-  { to: '/requests',        label: 'Services',   icon: ClipboardList },
-  { to: '/marinas',         label: 'Marinas',    icon: Anchor },
-  { to: '/messages',        label: 'Messages',   icon: MessageSquare },
-  { to: '/documents',       label: 'Documents',  icon: FileText },
+  { to: '/dashboard',           label: 'Dashboard',  icon: LayoutDashboard },
+  { to: '/boats/boat-1',        label: 'My Boats',   icon: Ship },
+  { to: '/marketplace',         label: 'Marketplace',icon: ShoppingBag },
+  { to: '/requests',            label: 'Services',   icon: ClipboardList },
+  { to: '/marinas',             label: 'Marinas',    icon: Anchor },
+  { to: '/insurance',           label: 'Insurance',  icon: Umbrella },
+  { to: '/messages',            label: 'Messages',   icon: MessageSquare },
+  { to: '/documents',           label: 'Documents',  icon: FileText },
 ];
 
 const providerNavLinks = [
@@ -49,6 +52,19 @@ const marinaNavLinks = [
 
 const adminNavLinks = [
   { to: '/admin', label: 'Admin Panel', icon: Shield },
+];
+
+const insurerNavLinks = [
+  { to: '/insurer-dashboard', label: 'Dashboard',   icon: LayoutDashboard },
+  { to: '/insurance/marketplace', label: 'Products', icon: Umbrella },
+  { to: '/messages',          label: 'Messages',    icon: MessageSquare },
+];
+
+const agentNavLinks = [
+  { to: '/agent-dashboard',   label: 'Dashboard',   icon: LayoutDashboard },
+  { to: '/insurance/marketplace', label: 'Products', icon: Umbrella },
+  { to: '/insurance',         label: 'Client Policies', icon: Shield },
+  { to: '/messages',          label: 'Messages',    icon: MessageSquare },
 ];
 
 export const Navbar: React.FC = () => {
@@ -76,18 +92,34 @@ export const Navbar: React.FC = () => {
     currentUser?.role === 'provider' ? providerNavLinks :
     currentUser?.role === 'admin'    ? adminNavLinks :
     currentUser?.role === 'marina'   ? marinaNavLinks :
+    currentUser?.role === 'insurer'  ? insurerNavLinks :
+    currentUser?.role === 'agent'    ? agentNavLinks :
     ownerNavLinks;
 
   const handleSwitchRole = () => {
-    const cycle: Record<string, UserRole> = { owner: 'provider', provider: 'marina', marina: 'admin', admin: 'owner' };
+    const cycle: Record<string, UserRole> = {
+      owner: 'provider', provider: 'marina', marina: 'admin',
+      admin: 'insurer', insurer: 'agent', agent: 'owner',
+    };
     const newRole: UserRole = cycle[currentUser?.role ?? 'owner'] ?? 'owner';
     switchRole(newRole);
-    const dest = newRole === 'provider' ? '/provider-dashboard'
-               : newRole === 'admin'    ? '/admin'
-               : newRole === 'marina'   ? '/marina-dashboard'
-               : '/dashboard';
+    const dest =
+      newRole === 'provider' ? '/provider-dashboard' :
+      newRole === 'admin'    ? '/admin' :
+      newRole === 'marina'   ? '/marina-dashboard' :
+      newRole === 'insurer'  ? '/insurer-dashboard' :
+      newRole === 'agent'    ? '/agent-dashboard' :
+      '/dashboard';
     navigate(dest);
     setProfileOpen(false);
+  };
+
+  const nextRoleLabel = (): string => {
+    const map: Record<string, string> = {
+      owner: 'Provider', provider: 'Marina', marina: 'Admin',
+      admin: 'Insurer', insurer: 'Agent', agent: 'Owner',
+    };
+    return map[currentUser?.role ?? 'owner'] ?? 'Owner';
   };
 
   const handleLogout = async () => {
@@ -196,7 +228,7 @@ export const Navbar: React.FC = () => {
                             className="flex items-center gap-2.5 px-4 py-2.5 w-full text-sm text-gray-600 hover:bg-gray-50 transition-colors"
                           >
                             <RefreshCw size={14} className="text-ocean-500" />
-                            Switch to {currentUser.role === 'owner' ? 'Provider' : currentUser.role === 'provider' ? 'Marina' : currentUser.role === 'marina' ? 'Admin' : 'Owner'} Mode
+                            Switch to {nextRoleLabel()} Mode
                           </button>
                         )}
                         <button className="flex items-center gap-2.5 px-4 py-2.5 w-full text-sm text-gray-600 hover:bg-gray-50 transition-colors">
@@ -268,7 +300,7 @@ export const Navbar: React.FC = () => {
                         className="flex items-center gap-3 px-4 py-3 w-full rounded-xl text-sm font-medium text-white/70 hover:text-white hover:bg-white/10 transition-colors"
                       >
                         <RefreshCw size={18} />
-                        Switch to {currentUser.role === 'owner' ? 'Provider' : currentUser.role === 'provider' ? 'Marina' : currentUser.role === 'marina' ? 'Admin' : 'Owner'} Mode
+                        Switch to {nextRoleLabel()} Mode
                       </button>
                     )}
                     <button
