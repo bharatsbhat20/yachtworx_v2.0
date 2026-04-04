@@ -576,6 +576,164 @@ create policy "marina_photos: owner manage"
   );
 
 -- =============================================================================
+-- 18. Walk-up booking read policy
+-- Walk-up bookings have owner_id IS NULL so the standard "mbb: owner read own"
+-- policy cannot match them.  Allow anyone who supplies the exact reference to
+-- read their booking (phone/walk-up guest receipt lookup).
+-- =============================================================================
+
+drop policy if exists "mbb: walk-up reference read" on public.marina_berth_bookings;
+create policy "mbb: walk-up reference read"
+  on public.marina_berth_bookings for select
+  using (booking_source in ('walk_up', 'phone') and owner_id is null);
+
+-- =============================================================================
+-- 19. Admin full-access policies for all Module 5 tables
+-- Admins (role in ('moderator','super_admin','admin')) can perform any
+-- operation on any marina table for support and auditing purposes.
+-- =============================================================================
+
+-- marinas
+drop policy if exists "marinas: admin all" on public.marinas;
+create policy "marinas: admin all"
+  on public.marinas for all
+  to authenticated
+  using (
+    exists (
+      select 1 from public.profiles
+      where id = auth.uid()
+        and role in ('moderator', 'super_admin', 'admin')
+    )
+  )
+  with check (
+    exists (
+      select 1 from public.profiles
+      where id = auth.uid()
+        and role in ('moderator', 'super_admin', 'admin')
+    )
+  );
+
+-- marina_berths
+drop policy if exists "marina_berths: admin all" on public.marina_berths;
+create policy "marina_berths: admin all"
+  on public.marina_berths for all
+  to authenticated
+  using (
+    exists (
+      select 1 from public.profiles
+      where id = auth.uid()
+        and role in ('moderator', 'super_admin', 'admin')
+    )
+  )
+  with check (
+    exists (
+      select 1 from public.profiles
+      where id = auth.uid()
+        and role in ('moderator', 'super_admin', 'admin')
+    )
+  );
+
+-- marina_berth_bookings
+drop policy if exists "mbb: admin all" on public.marina_berth_bookings;
+create policy "mbb: admin all"
+  on public.marina_berth_bookings for all
+  to authenticated
+  using (
+    exists (
+      select 1 from public.profiles
+      where id = auth.uid()
+        and role in ('moderator', 'super_admin', 'admin')
+    )
+  )
+  with check (
+    exists (
+      select 1 from public.profiles
+      where id = auth.uid()
+        and role in ('moderator', 'super_admin', 'admin')
+    )
+  );
+
+-- marina_staff
+drop policy if exists "marina_staff: admin all" on public.marina_staff;
+create policy "marina_staff: admin all"
+  on public.marina_staff for all
+  to authenticated
+  using (
+    exists (
+      select 1 from public.profiles
+      where id = auth.uid()
+        and role in ('moderator', 'super_admin', 'admin')
+    )
+  )
+  with check (
+    exists (
+      select 1 from public.profiles
+      where id = auth.uid()
+        and role in ('moderator', 'super_admin', 'admin')
+    )
+  );
+
+-- marina_provider_partnerships
+drop policy if exists "mpp: admin all" on public.marina_provider_partnerships;
+create policy "mpp: admin all"
+  on public.marina_provider_partnerships for all
+  to authenticated
+  using (
+    exists (
+      select 1 from public.profiles
+      where id = auth.uid()
+        and role in ('moderator', 'super_admin', 'admin')
+    )
+  )
+  with check (
+    exists (
+      select 1 from public.profiles
+      where id = auth.uid()
+        and role in ('moderator', 'super_admin', 'admin')
+    )
+  );
+
+-- marina_reviews
+drop policy if exists "marina_reviews: admin all" on public.marina_reviews;
+create policy "marina_reviews: admin all"
+  on public.marina_reviews for all
+  to authenticated
+  using (
+    exists (
+      select 1 from public.profiles
+      where id = auth.uid()
+        and role in ('moderator', 'super_admin', 'admin')
+    )
+  )
+  with check (
+    exists (
+      select 1 from public.profiles
+      where id = auth.uid()
+        and role in ('moderator', 'super_admin', 'admin')
+    )
+  );
+
+-- marina_photos
+drop policy if exists "marina_photos: admin all" on public.marina_photos;
+create policy "marina_photos: admin all"
+  on public.marina_photos for all
+  to authenticated
+  using (
+    exists (
+      select 1 from public.profiles
+      where id = auth.uid()
+        and role in ('moderator', 'super_admin', 'admin')
+    )
+  )
+  with check (
+    exists (
+      select 1 from public.profiles
+      where id = auth.uid()
+        and role in ('moderator', 'super_admin', 'admin')
+    )
+  );
+
+-- =============================================================================
 -- End of Module 5 Schema
 -- Nightly maintenance:
 --   select public.expire_job_opportunities();    -- from Module 4

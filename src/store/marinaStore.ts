@@ -773,7 +773,8 @@ export const useMarinaStore = create<MarinaStoreState>((set, get) => ({
         if (berthsResult.error) throw berthsResult.error;
         if (bookingsResult.error) throw bookingsResult.error;
 
-        // Get marina profile for defaults
+        // Get marina profile for defaults — auto-load if marinas[] not yet populated
+        if (get().marinas.length === 0) await get().loadMarinas();
         const marina = get().marinas.find(m => m.id === marinaId);
         if (!marina) { set({ isLoading: false }); return; }
 
